@@ -7,7 +7,7 @@ or source code on MLAPI's repository at https://github.com/MidLevel/MLAPI
 
 
 
-This repository is based off MLAPI's source code but with many changes to high level code such as easier to manage, implement and more code focused rather than Unity component / inspector focused in some cases. For example, Network Manager's inspector is completely blank so any settings should be set through code. As well as Network Transports do not derive from Unity's Component class. Classes and variables have been renamed such as instead of NetworkingBehaviour it is NetworkBehaviour in this implementation and other minor changes everywhere. This means it could conflict with other networking solutions but can be resolved by referencing them by assembly (or you know, removing that network framework and use this one). A lot of naming and code conventions differ from MLAPI. For example, any public field or property's first letter is lower-case instead of upper-case. You will find many small changes to code organization and code style.
+This repository is based off MLAPI's source code but with many changes to high level code such as easier to manage, implement and more code focused rather than Unity component / inspector focused in some cases. For example, Network Manager's inspector is completely blank so any settings should be set through code. As well as Network Transports do not derive from Unity's Component class. Classes and variables have been renamed such as instead of NetworkingBehaviour it is NetworkBehaviour in this implementation and other minor changes everywhere. This means it could conflict with other networking solutions but can be resolved by referencing them by assembly (or you know, removing that network framework and use this one). A lot of naming and code conventions differ from MLAPI. For example, any public field or property's first letter is lower-case instead of upper-case. You will find many small changes like this in code organization and code style.
 
 
 ### Other notes
@@ -17,7 +17,7 @@ This repository is based off MLAPI's source code but with many changes to high l
  - Player prefabs are removed completely and permanently.
  - MLAPI's NetworkingBehaviour and NetworkObject are merged into a single abstract NetworkBehaviour.
  - Seperated a lot of MLAPI's Network Behaviour functionality into modules to embrace the modular functionality that MLAPI is aiming for. For example, Network Manager will never reference Network Behaviours / owned objects like MLAPI does. (Also reduces spaghetti code a whole lot).
- - Usage of deprecatated and obsolete attributes will be used sparingly if at all.
+ - Usage of deprecated and obsolete attributes will be used sparingly if at all.
 
 ### Modules
  Implemented Modules where the Network Manager loads portions of code before network initialization. Modules are great way for developers to swap out a chunk of code if they don't like the implementation of specific part of the networking solution. For example, if you don't like the Network Behaviour Manager implementation, simply delete the single reference to it in the Network Manager and replace it with your own module. Modules have special event hooks that is called before any 'end developer' events are invoked. Network Manager also has some modules that are required such as Network Message Handler.
