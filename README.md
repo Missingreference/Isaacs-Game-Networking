@@ -13,10 +13,11 @@ This repository is based off MLAPI's source code but with many changes to high l
 ### Other notes
 
  - Security features and network profiling have been temporarily unimplemented and will be reimplemented in the future.
- - Sending network messages do not require as many parameters and is slightly faster than MLAPI.
+ - Sending network messages do not require as many parameters and receiving messages is slightly faster than MLAPI.
  - Player prefabs are removed completely and permanently.
  - MLAPI's NetworkingBehaviour and NetworkObject are merged into a single abstract NetworkBehaviour.
  - Seperated a lot of MLAPI's Network Behaviour functionality into modules to embrace the modular functionality that MLAPI is aiming for. For example, Network Manager will never reference Network Behaviours / owned objects like MLAPI does. (Also reduces spaghetti code a whole lot).
+ - Usage of deprecatated and obsolete attributes will be used sparingly if at all.
 
 ### Modules
  Implemented Modules where the Network Manager loads portions of code before network initialization. Modules are great way for developers to swap out a chunk of code if they don't like the implementation of specific part of the networking solution. For example, if you don't like the Network Behaviour Manager implementation, simply delete the single reference to it in the Network Manager and replace it with your own module. Modules have special event hooks that is called before any 'end developer' events are invoked. Network Manager also has some modules that are required such as Network Message Handler.
@@ -39,7 +40,7 @@ One main goal difference for Network Behaviours is that if the Network Manager i
 
 Another big goal for Network Behaviours is that they should be able to be created on the fly with instantiate but comes with minor caveats. This implementation should be much easier and reliable to create Network Behaviours than MLAPI. They can be created in 2 ways: With a unique ID or no unique ID.
 
-With a unique ID both a server and client can create a Network Behaviour whenever they come somewhat close to agreement on where they are in code execution but for the Network Behaviours to talk across the network, they must have a matching unique ID and matching Type(of course because a NetworkTransform and NetworkPlayer talking to eachother would not work whatsoever or make sense) and no other Network Behaviours on the same runtime can have the same unique ID(hence the name). This allows a client and server create a pre-planned NetworkBehaviour both knowing on their own ends what the unique ID will be and thus will connect to eachother. This is useful for prefabs or complex tranform trees.
+With a unique ID both a server and client can create a Network Behaviour whenever they come somewhat close to agreement on where they are in code execution but for the Network Behaviours to talk across the network they must have a matching unique ID and matching Type(of course because a NetworkTransform and NetworkPlayer talking to eachother would not work whatsoever or make sense) and no other Network Behaviours on the same runtime can have the same unique ID(hence the name). This allows a client and server create a pre-planned NetworkBehaviour both knowing on their own ends what the unique ID will be and thus will connect to eachother. This is useful for prefabs or complex tranform trees.
 
 The other option is blank unique IDs where only the server can create Network Behaviours with a blank unique ID. The server will then spawn this blank unique ID on the network like this because the client and server don't have the object pre-planned like a prefab so the server will send to the clients the Type of Network Behaviour with the blank unique ID and then on the client that component will be spawned on a new gameobject. Any extra components(renderers, physics, child objects, etc) that the behaviour will need will have to AddComponent or Instantiate via Awake, Start, NetworkStart or any other way. If we allowed clients to create Network Behaviours like this then they can be allowed to create objects willy-nilly(technical term) across the network and it will no longer be a server-authoritave implementation.
 
