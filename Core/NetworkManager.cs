@@ -147,7 +147,6 @@ namespace Isaac.Network
 
         //Private
         private readonly List<NetworkModule> m_Modules = new List<NetworkModule>();
-        private NetworkBehaviourManager m_BehaviourManager;
         private NetworkMessageHandler m_MessageHandler;
 
 		private ulong m_ClientID;
@@ -174,6 +173,7 @@ namespace Isaac.Network
 
 		void Start()
         {
+            //Used for showing the log in debug build
             if(Debug.isDebugBuild && !Application.isEditor) Debug.LogError("Init");
         }
 
@@ -475,6 +475,16 @@ namespace Isaac.Network
 		}
 
         #region Module Management
+
+        //Load Module produces an error when it loads an already loaded module so this checks first in case it is loaded.
+        private T SafeLoadModule<T>() where T : NetworkModule
+        {
+            if(GetModule<T>() == null)
+            {
+                return LoadModule<T>();
+            }
+            return GetModule<T>();
+        }
         
         private T LoadModule<T>() where T : NetworkModule
         {
@@ -566,7 +576,6 @@ namespace Isaac.Network
             {
                 LoadRequiredModules();
                 m_MessageHandler = GetModule<NetworkMessageHandler>();
-                m_BehaviourManager = GetModule<NetworkBehaviourManager>();
 
                 //Register required message types.
                 m_MessageHandler.RegisterMessageType(MessageType.NETWORK_CONNECTION_REQUEST.ToString(), HandleConnectionRequest, NetworkMessageHandler.NetworkMessageReceiver.Server);
@@ -620,31 +629,19 @@ namespace Isaac.Network
         private void LoadRequiredModules()
         {
             //Network Message Handler
-            if(GetModule<NetworkMessageHandler>() == null)
-            {
-                LoadModule<NetworkMessageHandler>();
-            }
+            m_MessageHandler = SafeLoadModule<NetworkMessageHandler>();
 
             //Network Behaviour Manager
-            if(GetModule<NetworkBehaviourManager>() == null)
-            {
-                LoadModule<NetworkBehaviourManager>();
-            }
+            SafeLoadModule<NetworkBehaviourManager>();
 
             //Scene Manager
-            if(GetModule<NetworkSceneManager>() == null)
-            {
-                LoadModule<NetworkSceneManager>();
-            }
+            SafeLoadModule<NetworkSceneManager>();
 
             
             if(Debug.isDebugBuild)
             {
                 //Network Log Module
-                if(GetModule<NetworkLogModule>() == null)
-                {
-                    LoadModule<NetworkLogModule>();
-                }
+                SafeLoadModule<NetworkLogModule>();
             }
         }
 

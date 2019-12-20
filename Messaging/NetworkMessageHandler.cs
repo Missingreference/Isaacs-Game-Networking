@@ -43,8 +43,6 @@ namespace Isaac.Network.Messaging
             }
         }
 
-        private NetworkBehaviourManager m_BehaviourManager;
-
         private readonly string[] m_MessageNames = new string[255];
         private readonly MessageCallbackDelagate[] m_Callbacks = new MessageCallbackDelagate[255];
         private readonly NetworkMessageReceiver[] m_Receivers = new NetworkMessageReceiver[255];
@@ -60,14 +58,7 @@ namespace Isaac.Network.Messaging
 
         public override void Init(NetworkModule[] loadedDependencies)
         {
-            for(int i = 0; i < loadedDependencies.Length; i++)
-            {
-                if(loadedDependencies[i] is NetworkBehaviourManager)
-                {
-                    m_BehaviourManager = (NetworkBehaviourManager)loadedDependencies[i];
-                    continue;
-                }
-            }
+
         }
 
         /// <summary>

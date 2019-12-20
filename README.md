@@ -3,11 +3,11 @@
 
  For information on MLAPI's features and API, refer to the MLAPI documentation at https://mlapi.network
 
-or on MLAPI's repository at https://github.com/MidLevel/MLAPI
+or source code on MLAPI's repository at https://github.com/MidLevel/MLAPI
 
 
 
-This repository is based off MLAPI's source code but with many changes to high level code such as easier to manage, implement and more code focused rather than Unity component / inspector focused in some cases for example Network Manager's inspector is completely blank so any settings should be set through code. As well as Network Transports do not derive from Unity component. Classes and variables have been renamed such as instead of NetworkingBehaviour it is NetworkBehaviour in this implementation and other minor changes everywhere. A lot of naming and code conventions differ from MLAPI for example any public field or property's first letter is lower-case instead of upper-case. You will find many small changes to code organisation and code style.
+This repository is based off MLAPI's source code but with many changes to high level code such as easier to manage, implement and more code focused rather than Unity component / inspector focused in some cases. For example, Network Manager's inspector is completely blank so any settings should be set through code. As well as Network Transports do not derive from Unity's Component class. Classes and variables have been renamed such as instead of NetworkingBehaviour it is NetworkBehaviour in this implementation and other minor changes everywhere. This means it could conflict with other networking solutions but can be resolved by referencing them by assembly (or you know, removing that network framework and use this one). A lot of naming and code conventions differ from MLAPI. For example, any public field or property's first letter is lower-case instead of upper-case. You will find many small changes to code organization and code style.
 
 
 ### Other notes
@@ -16,14 +16,15 @@ This repository is based off MLAPI's source code but with many changes to high l
  - Sending network messages do not require as many parameters and is slightly faster than MLAPI.
  - Player prefabs are removed completely and permanently.
  - MLAPI's NetworkingBehaviour and NetworkObject are merged into a single abstract NetworkBehaviour.
+ - Seperated a lot of MLAPI's Network Behaviour functionality into modules to embrace the modular functionality that MLAPI is aiming for. For example, Network Manager will never reference Network Behaviours / owned objects like MLAPI does. (Also reduces spaghetti code a whole lot).
 
 ### Modules
- Implemented Modules where the Network Manager loads portions of code before network initialization. Modules have special event hooks that is called before any 'end developer' events are invoked. Network Manager also has some modules that are required such as Network Message Handler.
+ Implemented Modules where the Network Manager loads portions of code before network initialization. Modules are great way for developers to swap out a chunk of code if they don't like the implementation of specific part of the networking solution. For example, if you don't like the Network Behaviour Manager implementation, simply delete the single reference to it in the Network Manager and replace it with your own module. Modules have special event hooks that is called before any 'end developer' events are invoked. Network Manager also has some modules that are required such as Network Message Handler.
 
 All modules derive from abstract NetworkModule class. Modules can have dependencies and will load those modules on network initialization. Related functions: NetworkManager.LoadModule<T>() and NetworkManager.GetModule<T>().
 
 
-**Current implemented modules:**
+**Currently Implemented Modules:**
 
 - Network Message Handler - Handles registering and unregistering network message types in byte format that network transports recognize. Network Manager requires this module for client connection approval. Other modules usually require this module.
 - Network Behaviour Manager - Handles Network Behaviours. Handles creation, destruction and messaging between them across the network.
@@ -31,7 +32,7 @@ All modules derive from abstract NetworkModule class. Modules can have dependenc
 - Network Log Module - Hooks into Unity's log handling and can send any log, warning and error messages and optional includes its stacktrace. This is used for debugging remote clients or the server from another client and should not be enabled in a final build.
 
 
-### Network Behaviour
+### Network Behaviours
  Network Behaviours work very differently from MLAPI and have different goals.
 
 One main goal difference for Network Behaviours is that if the Network Manager is NOT running then Network Behaviours should act as regular Monobehaviours but happens to have extra properties and functions(that probably won't do anything if they are called while the network is not running) so that it can be seemless implementation between singleplayer and multiplayer. For example, Network Behaviours have a property called isOwner that determines if the specific behaviour belongs to this client and can make important game changing functionality(such as being destroyed or its postion be allowed to be altered). This property should be properly set depending on the circumstances on the network but when the network is not running this should always be set to true so that any checks for ownership will be authorized for seemless singleplayer functionality without worrying about a server or client having ownership.
