@@ -196,7 +196,7 @@ namespace Isaac.Network.Spawning
                         Debug.Log("Sending to clients the new behaviour " + behaviour.GetType());
                     }
 
-                    MessageSender.SendToAll(addObjectMessageType, "NETWORK_INTERNAL", stream);
+                    MessageSender.SendToAll(addObjectMessageType, networkManager.networkInternalChannel, stream);
                 }
             }
             else //Client
@@ -286,7 +286,7 @@ namespace Isaac.Network.Spawning
                         Debug.Log("Sending to clients the destroyed message for behaviour " + behaviour.GetType());
                     }
 
-                    MessageSender.SendToAll(destroyObjectMessageType, "NETWORK_INTERNAL", stream);
+                    MessageSender.SendToAll(destroyObjectMessageType, networkManager.networkInternalChannel, stream);
                 }
 
                 //Do unspawn
@@ -382,7 +382,7 @@ namespace Isaac.Network.Spawning
                             Debug.Log("Sending to new client the existing behaviour '" + networkBehaviours[i].GetType() + "'.");
                         }
 
-                        MessageSender.SendToAll(addObjectMessageType, "NETWORK_INTERNAL", stream);
+                        MessageSender.SendToAll(addObjectMessageType, networkManager.networkInternalChannel, stream);
                     }
                 }
 
@@ -414,7 +414,7 @@ namespace Isaac.Network.Spawning
                             Debug.Log("Sending to new client the existing behaviour '" + values[i].reference.networkBehaviour.GetType() + "'.");
                         }
 
-                        MessageSender.SendToAll(addObjectMessageType, "NETWORK_INTERNAL", stream);
+                        MessageSender.SendToAll(addObjectMessageType, networkManager.networkInternalChannel, stream);
                     }
                 }
             }
@@ -608,7 +608,7 @@ namespace Isaac.Network.Spawning
                         Debug.Log("Sending success of add object with Network ID: " + networkID);
                 }
             
-                MessageSender.Send(networkManager.serverID, objectSuccessMessageType, "NETWORK_INTERNAL", stream);
+                MessageSender.Send(networkManager.serverID, objectSuccessMessageType, networkManager.networkInternalChannel, stream);
             }
 
             //Let our local behaviour know

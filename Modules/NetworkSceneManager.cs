@@ -48,14 +48,17 @@ namespace Isaac.Network.SceneManagement
 
         public NetworkSceneManager()
         {
-            for(int i = 0; i < GetAllSceneNames().Length; i++)
-            {
-                sceneHashes.Add(GetAllSceneNames()[i].GetStableHash(networkManager.config.rpcHashSize), GetAllSceneNames()[i]);
-            }
+
         }
 
         public override void Init(NetworkModule[] loadedDependencies)
         {
+            sceneHashes.Clear();
+            for(int i = 0; i < GetAllSceneNames().Length; i++)
+            {
+                sceneHashes.Add(GetAllSceneNames()[i].GetStableHash(networkManager.config.rpcHashSize), GetAllSceneNames()[i]);
+            }
+
             if(m_MessageHandler == null)
             {
                 for(int i = 0; i < loadedDependencies.Length; i++)
@@ -94,7 +97,7 @@ namespace Isaac.Network.SceneManagement
                         writer.WriteBool(loadSceneMode == LoadSceneMode.Additive); //Is Additive?
                         writer.WriteUInt64Packed(scene.name.GetStableHash(NetworkManager.Get().config.rpcHashSize));
 
-                        MessageSender.SendToAll(sceneChangeMessageType, "NETWORK_INTERNAL", stream);
+                        MessageSender.SendToAll(sceneChangeMessageType, networkManager.networkInternalChannel, stream);
                     }
                 }
             }
@@ -111,7 +114,7 @@ namespace Isaac.Network.SceneManagement
                         writer.WriteBool(loadSceneMode == LoadSceneMode.Additive); //Is Additive?
                         writer.WriteUInt64Packed(scene.name.GetStableHash(NetworkManager.Get().config.rpcHashSize));
 
-                        MessageSender.Send(networkManager.serverID, sceneChangeMessageType, "NETWORK_INTERNAL", stream);
+                        MessageSender.Send(networkManager.serverID, sceneChangeMessageType, networkManager.networkInternalChannel, stream);
                     }
                 }
             }
@@ -132,7 +135,7 @@ namespace Isaac.Network.SceneManagement
                         writer.WriteBool(false); //Is Loading
                         writer.WriteUInt64Packed(scene.name.GetStableHash(NetworkManager.Get().config.rpcHashSize));
 
-                        MessageSender.SendToAll(sceneChangeMessageType, "NETWORK_INTERNAL", stream);
+                        MessageSender.SendToAll(sceneChangeMessageType, networkManager.networkInternalChannel, stream);
                     }
                 }
             }
@@ -148,7 +151,7 @@ namespace Isaac.Network.SceneManagement
                         writer.WriteBool(false); //Is Loading
                         writer.WriteUInt64Packed(scene.name.GetStableHash(NetworkManager.Get().config.rpcHashSize));
 
-                        MessageSender.Send(networkManager.serverID, sceneChangeMessageType, "NETWORK_INTERNAL", stream);
+                        MessageSender.Send(networkManager.serverID, sceneChangeMessageType, networkManager.networkInternalChannel, stream);
                     }
                 }
             }

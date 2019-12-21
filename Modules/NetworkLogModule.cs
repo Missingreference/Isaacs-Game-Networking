@@ -139,7 +139,7 @@ namespace Isaac.Network.Development
                 using(PooledBitWriter writer = PooledBitWriter.Get(stream))
                 {
                     writer.WriteBool(sendLogs);
-                    MessageSender.Send(clientID, networkToggleLogMessageType, "NETWORK_INTERNAL", stream);
+                    MessageSender.Send(clientID, networkToggleLogMessageType, networkManager.networkInternalChannel, stream);
                 }
             }
         }
@@ -167,7 +167,7 @@ namespace Isaac.Network.Development
                     else
                     {
                         //Send to server
-                        MessageSender.Send(networkManager.serverID, networkLogMessageType, "NETWORK_INTERNAL", stream);
+                        MessageSender.Send(networkManager.serverID, networkLogMessageType, networkManager.networkInternalChannel, stream);
                     }
                 }
             }

@@ -294,8 +294,8 @@ namespace Isaac.Network.Transports
             int channelsLeft = channelCount;
             for(byte i = 0; i < channelCount; i++)
             {
-                TransportChannel transportChannel = TryGetTransportChannel(i);
-                if(transportChannel == null) continue;
+                if(!TryGetTransportChannel(i, out TransportChannel transportChannel))
+                    continue;
 
                 byte unetChannel = config.AddChannel(ChannelTypeToQosType(transportChannel.channelType));
                 m_UnetChannelLookup.Add(i, unetChannel);

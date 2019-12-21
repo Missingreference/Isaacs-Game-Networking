@@ -24,7 +24,7 @@ namespace MLAPI.NetworkedVar
         /// <summary>
         /// Gets the last time the variable was synced
         /// </summary>
-        public float LastSyncedTime { get; internal set; }        
+        public float LastSyncedTime { get; internal set; }
         /// <summary>
         /// Delegate type for value changed event
         /// </summary>
@@ -36,13 +36,13 @@ namespace MLAPI.NetworkedVar
         /// </summary>
         public OnValueChangedDelegate OnValueChanged;
         private NetworkBehaviour networkedBehaviour;
-     
+
         /// <summary>
         /// Creates a NetworkedVar with the default value and settings
         /// </summary>
         public NetworkedVar()
         {
-            
+
         }
 
         /// <summary>
@@ -87,12 +87,12 @@ namespace MLAPI.NetworkedVar
             }
             set
             {
-                if (!EqualityComparer<T>.Default.Equals(InternalValue, value))
+                if(!EqualityComparer<T>.Default.Equals(InternalValue, value))
                 {
                     isDirty = true;
                     T previousValue = InternalValue;
                     InternalValue = value;
-                    if (OnValueChanged != null)
+                    if(OnValueChanged != null)
                         OnValueChanged(previousValue, InternalValue);
                 }
             }
@@ -102,37 +102,37 @@ namespace MLAPI.NetworkedVar
         public void ResetDirty()
         {
             isDirty = false;
-            LastSyncedTime = networkManager.NetworkTime;
+            LastSyncedTime = networkManager.networkTime;
         }
 
         /// <inheritdoc />
         public bool IsDirty()
         {
-            if (!isDirty) return false;
-            if (Settings.SendTickrate == 0) return true;
-            if (Settings.SendTickrate < 0) return false;
-            if (networkManager.NetworkTime - LastSyncedTime >= (1f / Settings.SendTickrate)) return true;
+            if(!isDirty) return false;
+            if(Settings.SendTickrate == 0) return true;
+            if(Settings.SendTickrate < 0) return false;
+            if(networkManager.networkTime - LastSyncedTime >= (1f / Settings.SendTickrate)) return true;
             return false;
         }
 
-		public NetworkManager networkManager
-		{
-			get
-			{
-				if(m_NetworkManager == null)
-				{
-					m_NetworkManager = GameObject.FindObjectOfType<NetworkManager>();
-				}
-				return m_NetworkManager;
-			}
-		}
+        public NetworkManager networkManager
+        {
+            get
+            {
+                if(m_NetworkManager == null)
+                {
+                    m_NetworkManager = GameObject.FindObjectOfType<NetworkManager>();
+                }
+                return m_NetworkManager;
+            }
+        }
 
-		private NetworkManager m_NetworkManager;
+        private NetworkManager m_NetworkManager;
 
         /// <inheritdoc />
         public bool CanClientRead(ulong clientId)
         {
-            switch (Settings.ReadPermission)
+            switch(Settings.ReadPermission)
             {
                 case NetworkedVarPermission.Everyone:
                     return true;
@@ -141,10 +141,10 @@ namespace MLAPI.NetworkedVar
                 case NetworkedVarPermission.OwnerOnly:
                     return networkedBehaviour.ownerClientID == clientId;
                 case NetworkedVarPermission.Custom:
-                {
-                    if (Settings.ReadPermissionCallback == null) return false;
-                    return Settings.ReadPermissionCallback(clientId);
-                }
+                    {
+                        if(Settings.ReadPermissionCallback == null) return false;
+                        return Settings.ReadPermissionCallback(clientId);
+                    }
             }
             return true;
         }
@@ -158,7 +158,7 @@ namespace MLAPI.NetworkedVar
         /// <inheritdoc />
         public bool CanClientWrite(ulong clientId)
         {
-            switch (Settings.WritePermission)
+            switch(Settings.WritePermission)
             {
                 case NetworkedVarPermission.Everyone:
                     return true;
@@ -167,10 +167,10 @@ namespace MLAPI.NetworkedVar
                 case NetworkedVarPermission.OwnerOnly:
                     return networkedBehaviour.ownerClientID == clientId;
                 case NetworkedVarPermission.Custom:
-                {
-                    if (Settings.WritePermissionCallback == null) return false;
-                    return Settings.WritePermissionCallback(clientId);
-                }
+                    {
+                        if(Settings.WritePermissionCallback == null) return false;
+                        return Settings.WritePermissionCallback(clientId);
+                    }
             }
 
             return true;
@@ -183,14 +183,14 @@ namespace MLAPI.NetworkedVar
         /// <param name="keepDirtyDelta">Whether or not the container should keep the dirty delta, or mark the delta as consumed</param>
         public void ReadDelta(Stream stream, bool keepDirtyDelta)
         {
-            using (PooledBitReader reader = PooledBitReader.Get(stream))
+            using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
                 T previousValue = InternalValue;
                 InternalValue = (T)reader.ReadObjectPacked((typeof(T)));
 
-                if (keepDirtyDelta) isDirty = true;
+                if(keepDirtyDelta) isDirty = true;
 
-                if (OnValueChanged != null)
+                if(OnValueChanged != null)
                     OnValueChanged(previousValue, InternalValue);
             }
         }
@@ -206,11 +206,11 @@ namespace MLAPI.NetworkedVar
         {
             ReadDelta(stream, false);
         }
-        
+
         /// <inheritdoc />
         public void WriteField(Stream stream)
         {
-            using (PooledBitWriter writer = PooledBitWriter.Get(stream))
+            using(PooledBitWriter writer = PooledBitWriter.Get(stream))
             {
                 writer.WriteObjectPacked(InternalValue); //BOX
             }
@@ -222,7 +222,7 @@ namespace MLAPI.NetworkedVar
             return Settings.SendChannel;
         }
     }
-    
+
     /// <summary>
     /// A NetworkedVar that holds strings and support serialization
     /// </summary>
@@ -286,7 +286,7 @@ namespace MLAPI.NetworkedVar
         /// <inheritdoc />
         public NetworkedVarSByte(NetworkedVarSettings settings, sbyte value) : base(settings, value) { }
     }
-    
+
     /// <summary>
     /// A NetworkedVar that holds ushorts and support serialization
     /// </summary>

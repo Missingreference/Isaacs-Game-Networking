@@ -19,6 +19,7 @@ using Isaac.Network.Spawning;
 using Isaac.Network.Messaging;
 using Isaac.Network.SceneManagement;
 using Isaac.Network.Development;
+using Isaac.Network.Exceptions;
 
 namespace Isaac.Network
 {
@@ -113,7 +114,7 @@ namespace Isaac.Network
 		/// <summary>
 		/// A synchronized time, represents the time in seconds since the server application started. Is replicated across all clients
 		/// </summary>
-		public float NetworkTime => Time.unscaledTime + m_CurrentNetworkTimeOffset;
+		public float networkTime => Time.unscaledTime + m_CurrentNetworkTimeOffset;
 
         /// <summary>
         /// Gets a list of connected clients
@@ -143,6 +144,16 @@ namespace Isaac.Network
         /// </summary>
         public Action onShutdown;
 
+        /// <summary>
+        /// The internal transport channel used for internal messages. The channel name is "NETWORK_CHANNEL". Unregistering this channel from the transport will cause errors.
+        /// </summary>
+        public byte networkInternalChannel { get; private set; } = NetworkTransport.INVALID_CHANNEL;
+
+        /// <summary>
+        /// The transport channel that the Network Manager uses for syncronizing time. The channel name is "NETWORK_TIME_SYNC". Unregistering this channel from the transport will cause errors.
+        /// </summary>
+        public byte timeSyncChannel { get; private set; } = NetworkTransport.INVALID_CHANNEL;
+
         public bool enableLogging = false;
 
         //Private
@@ -155,10 +166,6 @@ namespace Isaac.Network
 		private bool m_NetworkTimeInitialized;
 		private NetworkTransport m_Transport = null;
 		private NetworkConfig m_Config = null;
-
-        //Channels
-        private byte m_NetworkInternalChannel = NetworkTransport.INVALID_CHANNEL;
-        private byte m_TimeSyncChannel = NetworkTransport.INVALID_CHANNEL;
 
 		void Awake()
 		{
@@ -186,7 +193,7 @@ namespace Isaac.Network
 
             if(isRunning)
             {
-                if((NetworkTime - m_LastReceiveTickTime >= (1f / config.receiveTickrate)) || config.receiveTickrate <= 0)
+                if((networkTime - m_LastReceiveTickTime >= (1f / config.receiveTickrate)) || config.receiveTickrate <= 0)
                 {
                     NetEventType eventType;
                     int processedEvents = 0;
@@ -198,7 +205,7 @@ namespace Isaac.Network
 
                         // Only do another iteration if: there are no more messages AND (there is no limit to max events or we have processed less than the maximum)
                     } while(isRunning && (eventType != NetEventType.Nothing && (config.maxReceiveEventsPerTickRate <= 0 || processedEvents < config.maxReceiveEventsPerTickRate)));
-                    m_LastReceiveTickTime = NetworkTime;
+                    m_LastReceiveTickTime = networkTime;
                 }
 
                 if(!isRunning)
@@ -207,12 +214,12 @@ namespace Isaac.Network
                     return;
                 }
 
-                if(((NetworkTime - m_LastEventTickTime >= (1f / config.eventTickrate))))
+                if(((networkTime - m_LastEventTickTime >= (1f / config.eventTickrate))))
                 {
 
                     if(isServer)
                     {
-                        m_EventOvershootCounter += ((NetworkTime - m_LastEventTickTime) - (1f / config.eventTickrate));
+                        m_EventOvershootCounter += ((networkTime - m_LastEventTickTime) - (1f / config.eventTickrate));
                         //LagCompensationManager.AddFrames();
                         ResponseMessageManager.CheckTimeouts();
                     }
@@ -225,7 +232,7 @@ namespace Isaac.Network
 
                     if(isServer)
                     {
-                        m_LastEventTickTime = NetworkTime;
+                        m_LastEventTickTime = networkTime;
                     }
 
                 }
@@ -236,10 +243,10 @@ namespace Isaac.Network
                     //LagCompensationManager.AddFrames();
                 }
 
-                if(isServer && config.enableTimeResync && NetworkTime - m_LastTimeSyncTime >= config.timeResyncInterval)
+                if(isServer && config.enableTimeResync && networkTime - m_LastTimeSyncTime >= config.timeResyncInterval)
                 {
                     SyncTime();
-                    m_LastTimeSyncTime = NetworkTime;
+                    m_LastTimeSyncTime = networkTime;
                 }
 
                 if(!Mathf.Approximately(m_NetworkTimeOffset, m_CurrentNetworkTimeOffset))
@@ -280,6 +287,16 @@ namespace Isaac.Network
             {
                 transport.OnTransportEvent -= HandleRawTransportPoll;
                 transport.Shutdown();
+
+                //Unregister required channels
+                if(transport.TryGetTransportChannel(networkInternalChannel, out _))
+                {
+                    transport.UnregisterChannel(networkInternalChannel);
+                }
+                if(transport.TryGetTransportChannel(timeSyncChannel, out _))
+                {
+                    transport.UnregisterChannel(timeSyncChannel);
+                }
             }
 
             //Remove from DontDestroyOnLoad
@@ -571,17 +588,55 @@ namespace Isaac.Network
 
             ResponseMessageManager.Clear();
 
-            //Load Modules
-            if(m_MessageHandler == null)
+            if(config == null)
             {
-                LoadRequiredModules();
-                m_MessageHandler = GetModule<NetworkMessageHandler>();
+                throw new NetworkConfigurationException("No config was specified. Cannot start the Network Manager without a Network Config.");
+            }
 
-                //Register required message types.
+            if(transport == null)
+            {
+                throw new NetworkConfigurationException("No transport was specified. Cannot start the Network Manager without a Network Transport.");
+            }
+
+            //TODO Implement unregister in Message Handler so we don't have to do this work around
+            bool doRegister = m_MessageHandler == null;
+            //Load Modules
+            LoadRequiredModules();
+
+            //Register required message types.
+            if(doRegister)
+            {
                 m_MessageHandler.RegisterMessageType(MessageType.NETWORK_CONNECTION_REQUEST.ToString(), HandleConnectionRequest, NetworkMessageHandler.NetworkMessageReceiver.Server);
                 m_MessageHandler.RegisterMessageType(MessageType.NETWORK_CONNECTION_APPROVED.ToString(), HandleConnectionApproved, NetworkMessageHandler.NetworkMessageReceiver.Client);
                 m_MessageHandler.RegisterMessageType(MessageType.NETWORK_TIME_SYNC.ToString(), HandleTimeSync, NetworkMessageHandler.NetworkMessageReceiver.Client);
             }
+
+            //Register channels
+            if(transport.TryGetTransportChannel("NETWORK_INTERNAL", out TransportChannel transportChannel))
+            {
+                //The channel already exists with the name or byte channel so let the developer know that they can't use it.
+                Debug.LogWarning("The channel 'NETWORK_INTERNAL' is a required channel for the Network Manager. Unregistering...");
+                transport.UnregisterChannel(transportChannel.channel);
+            }
+
+            if(transport.TryGetTransportChannel("NETWORK_TIME_SYNC", out transportChannel))
+            {
+                //The channel already exists with the name or byte channel so let the developer know that they can't use it.
+                Debug.LogWarning("The channel 'NETWORK_TIME_SYNC' is a required channel for the Network Manager. Unregistering...");
+                transport.UnregisterChannel(transportChannel.channel);
+            }
+
+            //Do register
+            //Note developers should not(usually) register channels like this so that they can reliably trigger the warnings associated with NetworkTransport.RegisterChannel.
+            if((transport.supportedChannelTypes & ChannelType.ReliableFragmentedSequenced) == ChannelType.ReliableFragmentedSequenced)
+                networkInternalChannel = transport.RegisterChannel("NETWORK_INTERNAL", ChannelType.ReliableFragmentedSequenced);
+            else
+                networkInternalChannel = transport.RegisterChannel("NETWORK_INTERNAL", transport.GetUnsupportedChannelTypeFallback(ChannelType.ReliableFragmentedSequenced));
+
+            if((transport.supportedChannelTypes & ChannelType.Unreliable) == ChannelType.Unreliable)
+                timeSyncChannel = transport.RegisterChannel("NETWORK_TIME_SYNC", ChannelType.Unreliable);
+            else
+                timeSyncChannel = transport.RegisterChannel("NETWORK_TIME_SYNC", transport.GetUnsupportedChannelTypeFallback(ChannelType.Unreliable));
 
             //Init Modules
             for(int i = 0; i < m_Modules.Count; i++)
@@ -607,17 +662,6 @@ namespace Isaac.Network
                 }
                 m_Modules[i].Init(dependantModules);
             }
-
-            if(config == null)
-			{
-				Debug.LogError("Failed to Init Network Manager. No config is set.");
-				return;
-			}
-			if(transport == null)
-			{
-				Debug.LogError("Failed to Init Network Manager. No transport is set.");
-				return;
-			}
 
             DontDestroyOnLoad(gameObject);
 
@@ -755,9 +799,9 @@ namespace Isaac.Network
 
 		private IEnumerator ApprovalTimeout(ulong connectingClientID)
 		{
-			float timeStarted = NetworkTime;
+			float timeStarted = networkTime;
 			//We yield every frame incase a pending client disconnects and someone else gets its connection id
-			while (NetworkTime - timeStarted < config.clientConnectionBufferTimeout && pendingClients.ContainsKey(connectingClientID))
+			while (networkTime - timeStarted < config.clientConnectionBufferTimeout && pendingClients.ContainsKey(connectingClientID))
 			{
 				yield return null;
 			}
@@ -783,7 +827,7 @@ namespace Isaac.Network
 					//	writer.WriteByteArray(NetworkConfig.ConnectionData);
 				}
 
-				MessageSender.Send(serverID, MessageType.NETWORK_CONNECTION_REQUEST, "NETWORK_INTERNAL", stream);
+				MessageSender.Send(serverID, MessageType.NETWORK_CONNECTION_REQUEST, networkInternalChannel, stream);
 			}
 		}
 
@@ -802,7 +846,7 @@ namespace Isaac.Network
 				using (PooledBitWriter writer = PooledBitWriter.Get(stream))
 				{
 					writer.WriteSinglePacked(Time.realtimeSinceStartup);
-					MessageSender.SendToAll(MessageType.NETWORK_TIME_SYNC, "NETWORK_TIME_SYNC", stream);
+					MessageSender.SendToAll(MessageType.NETWORK_TIME_SYNC, timeSyncChannel, stream);
 				}
 			}
             if(enableLogging)
@@ -831,7 +875,7 @@ namespace Isaac.Network
 
 						writer.WriteUInt32Packed(0);
 
-						MessageSender.Send(sendingClientID, MessageType.NETWORK_CONNECTION_APPROVED, "NETWORK_INTERNAL", stream);
+						MessageSender.Send(sendingClientID, MessageType.NETWORK_CONNECTION_APPROVED, networkInternalChannel, stream);
 
                         for(int i = 0; i < m_Modules.Count; i++)
                         {
@@ -876,7 +920,6 @@ namespace Isaac.Network
 
                 float netTime = reader.ReadSinglePacked();
                 UpdateNetworkTime(sendingClientID, netTime, receiveTime, true);
-                //networkManager.connectedClientsDictionary.Add(networkManager.clientID, new NetworkedClient { clientID = networkManager.clientID });
                 connectedClients.Add(sendingClientID);
                 isConnected = true;
 

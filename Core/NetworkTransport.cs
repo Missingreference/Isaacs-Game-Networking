@@ -51,17 +51,6 @@ namespace Isaac.Network
                 RegisterChannel("NETWORK_DEFAULT", ChannelType.Reliable);
             else
                 RegisterChannel("NETWORK_DEFAULT", GetUnsupportedChannelTypeFallback(ChannelType.Reliable));
-
-            //MOVE THIS TO NETWORK MANAGER?
-            if((supportedChannelTypes & ChannelType.ReliableFragmentedSequenced) == ChannelType.ReliableFragmentedSequenced)
-                RegisterChannel("NETWORK_INTERNAL", ChannelType.ReliableFragmentedSequenced);
-            else
-                RegisterChannel("NETWORK_INTERNAL", GetUnsupportedChannelTypeFallback(ChannelType.ReliableFragmentedSequenced));
-
-            if((supportedChannelTypes & ChannelType.Unreliable) == ChannelType.Unreliable)
-                RegisterChannel("NETWORK_TIME_SYNC", ChannelType.Unreliable);
-            else
-                RegisterChannel("NETWORK_TIME_SYNC", GetUnsupportedChannelTypeFallback(ChannelType.Unreliable));
         }
 
 		/// <summary>
@@ -173,7 +162,7 @@ namespace Isaac.Network
             }
 
             //Do register
-            m_Channels.Add(new TransportChannel() { name = channelName, channelType = channelType });
+            m_Channels.Add(new TransportChannel() { name = channelName, channel = chosenChannelIndex, channelType = channelType });
             m_ChannelsByName.Add(channelName, chosenChannelIndex);
             m_ChannelCount++;
             return chosenChannelIndex;
@@ -193,7 +182,7 @@ namespace Isaac.Network
             }
 
             //Disallow unregistering of built-in channels
-            if(channel == DEFAULT_CHANNEL || channel == 1 || channel == 2)
+            if(channel == DEFAULT_CHANNEL)
             {
                 throw new ArgumentException("Channel '" + channel + "' is a built-in channel and cannot be unregistered.", nameof(channel));
             }
@@ -251,11 +240,27 @@ namespace Isaac.Network
             return transportChannel.channelType;
         }
 
-        public TransportChannel TryGetTransportChannel(byte channel)
+        public bool TryGetTransportChannel(byte channel, out TransportChannel transportChannel)
         {
             if(channel >= m_Channels.Count)
-                return null;
-            return m_Channels[channel];
+            {
+                transportChannel = null;
+                return false;
+            }
+            transportChannel = m_Channels[channel];
+            return transportChannel != null; //Null comparison is probably faster than doing a m_FreeChannels.Contains call
+        }
+
+        public bool TryGetTransportChannel(string channelName, out TransportChannel transportChannel)
+        {
+            if(m_ChannelsByName.TryGetValue(channelName, out byte channel))
+            {
+                transportChannel = m_Channels[channel];
+                return true;
+            }
+
+            transportChannel = null;
+            return false;
         }
 
         public virtual ChannelType GetUnsupportedChannelTypeFallback(ChannelType channelType) { return channelType; }
@@ -319,6 +324,11 @@ namespace Isaac.Network
 		/// The name of the channel
 		/// </summary>
 		public string name;
+
+        /// <summary>
+        /// The actual byte channel
+        /// </summary>
+        public byte channel;
 
 		/// <summary>
 		/// The type of channel

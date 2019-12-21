@@ -1,5 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System;
+
 using UnityEngine;
 
 namespace Isaac.Network
@@ -28,7 +30,7 @@ namespace Isaac.Network
         /// <summary>
         /// Gets whether the behaviour is owned by the local client. Also is true if the network manager is not running in cases where network behaviours are being used offline.
         /// </summary>
-        public bool isOwner => (networkManager != null && ownerClientID == networkManager.clientID) || networkManager == null || !networkManager.isRunning;
+        public bool isOwner => (networkManager != null && networkManager.isRunning && ownerClientID == networkManager.clientID) || networkManager == null || !networkManager.isRunning;
 
         /// <summary>
         /// Gets whether or not the object is owned by the server.
@@ -42,6 +44,7 @@ namespace Isaac.Network
         public void ChangeOwnership(ulong targetClientID)
         {
             //TODO Reimplement ChangeOwnership
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -50,16 +53,17 @@ namespace Isaac.Network
         public void RemoveOwnership()
         {
             //TODO Reimplement RemoveOwnership
+            throw new NotImplementedException();
         }
 
         protected virtual void OnGainedOwnership()
         {
-
+            throw new NotImplementedException();
         }
 
         protected virtual void OnLostOwnership()
         {
-
+            throw new NotImplementedException();
         }
     }
 }
