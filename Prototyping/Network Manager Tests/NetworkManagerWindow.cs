@@ -49,6 +49,10 @@ public class NetworkManagerWindow : MonoBehaviour
         stopButton = bigWindow.transform.Find("Stop Button").GetComponent<Button>();
         stopButton.onClick.AddListener(OnStopButtonPressed);
         networkManager = NetworkManager.Get();
+        if(networkManager == null)
+        {
+            networkManager = new GameObject("Network Manager").AddComponent<NetworkManager>();
+        }
 
         Hide();
     }

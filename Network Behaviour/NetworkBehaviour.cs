@@ -22,8 +22,8 @@ using Isaac.Network.Exceptions;
 
 namespace Isaac.Network
 {
-	public abstract partial class NetworkBehaviour : MonoBehaviour
-	{
+    public abstract partial class NetworkBehaviour : MonoBehaviour
+    {
         #region Static
 
         private ulong HashMethod(MethodInfo method)
@@ -40,21 +40,21 @@ namespace Isaac.Network
         }
 
         private static readonly StringBuilder methodInfoStringBuilder = new StringBuilder();
-		private static readonly Dictionary<MethodInfo, ulong> methodInfoHashTable = new Dictionary<MethodInfo, ulong>();
-		internal static string GetHashableMethodSignature(MethodInfo method)
-		{
-			methodInfoStringBuilder.Length = 0;
-			methodInfoStringBuilder.Append(method.Name);
+        private static readonly Dictionary<MethodInfo, ulong> methodInfoHashTable = new Dictionary<MethodInfo, ulong>();
+        internal static string GetHashableMethodSignature(MethodInfo method)
+        {
+            methodInfoStringBuilder.Length = 0;
+            methodInfoStringBuilder.Append(method.Name);
 
-			ParameterInfo[] parameters = method.GetParameters();
+            ParameterInfo[] parameters = method.GetParameters();
 
-			for (int i = 0; i < parameters.Length; i++)
-			{
-				methodInfoStringBuilder.Append(parameters[i].ParameterType.Name);
-			}
+            for(int i = 0; i < parameters.Length; i++)
+            {
+                methodInfoStringBuilder.Append(parameters[i].ParameterType.Name);
+            }
 
-			return methodInfoStringBuilder.ToString();
-		}
+            return methodInfoStringBuilder.ToString();
+        }
 
         #endregion
 
@@ -135,8 +135,25 @@ namespace Isaac.Network
             }
         }
 
-        //Can only be set by the owner through SpawnOnNetwork or ownership change functions
-        public bool ownerCanUnspawn => m_OwnerCanUnspawn;
+        /// <summary>
+        /// Set whether the owner(client) of this Network Behaviour can unspawn on network. Server can unspawn regardless of the setting of this property. Only the server can set this settings. It is recommended that this setting is set before spawning on the network.
+        /// Changing this value will send a message to all clients.
+        /// </summary>
+        public bool ownerCanUnspawn
+        {
+            get
+            {
+                return m_OwnerCanUnspawn;
+            }
+            set
+            {
+                if(!isServer)
+                {
+                    throw new NotServerException("Only the server can set the ownerCanUnspawn property.");
+                }
+                m_OwnerCanUnspawn = value;
+            }
+        }
 
         /// <summary>
         /// Reference to the Network Manager.
