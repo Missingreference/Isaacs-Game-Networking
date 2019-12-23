@@ -17,12 +17,11 @@ This repository is based off MLAPI's source code but with many changes to high l
  - Player prefabs are removed completely and permanently.
  - MLAPI's NetworkingBehaviour and NetworkObject are merged into a single abstract NetworkBehaviour.
  - Seperated a lot of MLAPI's Network Behaviour functionality into modules to embrace the modular functionality that MLAPI is aiming for. For example, Network Manager will never reference Network Behaviours / owned objects like MLAPI does. (Also reduces spaghetti code a whole lot).
- - Usage of deprecated and obsolete attributes will be used sparingly if at all.
 
 ### Modules
  Implemented Modules where the Network Manager loads portions of code before network initialization. Modules are great way for developers to swap out a chunk of code if they don't like the implementation of specific part of the networking solution. For example, if you don't like the Network Behaviour Manager implementation, simply delete the single reference to it in the Network Manager and replace it with your own module. Modules have special event hooks that is called before any 'end developer' events are invoked. Network Manager also has some modules that are required such as Network Message Handler.
 
-All modules derive from abstract NetworkModule class. Modules can have dependencies and will load those modules on network initialization. Related functions: NetworkManager.LoadModule<T>() and NetworkManager.GetModule<T>().
+All modules derive from abstract NetworkModule class. Modules can have dependencies and will load those modules on network initialization.
 
 
 **Currently Implemented Modules:**
