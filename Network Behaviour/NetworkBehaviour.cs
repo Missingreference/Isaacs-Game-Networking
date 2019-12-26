@@ -147,7 +147,7 @@ namespace Isaac.Network
             }
             set
             {
-                if(!isServer)
+                if(networkManager.isRunning && !isServer)
                 {
                     throw new NotServerException("Only the server can set the ownerCanUnspawn property.");
                 }
@@ -334,6 +334,5 @@ namespace Isaac.Network
         {
             InvokeLocalServerRPC(hash, senderClientID, stream);
         }
-
     } //Class
 } //Namespace

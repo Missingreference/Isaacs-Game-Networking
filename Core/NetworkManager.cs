@@ -272,47 +272,6 @@ namespace Isaac.Network
             //Shutdown();
         }
 
-        private void Shutdown()
-        {
-            Debug.Log("Shutdown called");
-            if(enableLogging)
-                Debug.Log("Shutdown called");
-
-            bool initialized = isRunning;
-
-            isServer = false;
-            isClient = false;
-
-            if(transport != null)
-            {
-                transport.OnTransportEvent -= HandleRawTransportPoll;
-                transport.Shutdown();
-
-                //Unregister required channels
-                if(transport.TryGetTransportChannel(networkInternalChannel, out _))
-                {
-                    transport.UnregisterChannel(networkInternalChannel);
-                }
-                if(transport.TryGetTransportChannel(timeSyncChannel, out _))
-                {
-                    transport.UnregisterChannel(timeSyncChannel);
-                }
-            }
-
-            //Remove from DontDestroyOnLoad
-            SceneManager.MoveGameObjectToScene(gameObject, SceneManager.GetActiveScene());
-
-            //onShutdown event should only be called when on onInitilize is called.
-            if(initialized)
-            {
-                for(int i = 0; i < m_Modules.Count; i++)
-                {
-                    m_Modules[i].Shutdown();
-                }
-                onShutdown?.Invoke();
-            }
-        }
-
         public void StartServer()
 		{
             if(enableLogging)
@@ -669,6 +628,47 @@ namespace Isaac.Network
 
 			transport.Init();
 		}
+
+        private void Shutdown()
+        {
+            Debug.Log("Shutdown called");
+            if(enableLogging)
+                Debug.Log("Shutdown called");
+
+            bool initialized = isRunning;
+
+            isServer = false;
+            isClient = false;
+
+            if(transport != null)
+            {
+                transport.OnTransportEvent -= HandleRawTransportPoll;
+                transport.Shutdown();
+
+                //Unregister required channels
+                if(transport.TryGetTransportChannel(networkInternalChannel, out _))
+                {
+                    transport.UnregisterChannel(networkInternalChannel);
+                }
+                if(transport.TryGetTransportChannel(timeSyncChannel, out _))
+                {
+                    transport.UnregisterChannel(timeSyncChannel);
+                }
+            }
+
+            //Remove from DontDestroyOnLoad
+            SceneManager.MoveGameObjectToScene(gameObject, SceneManager.GetActiveScene());
+
+            //onShutdown event should only be called when on onInitilize is called.
+            if(initialized)
+            {
+                for(int i = 0; i < m_Modules.Count; i++)
+                {
+                    m_Modules[i].Shutdown();
+                }
+                onShutdown?.Invoke();
+            }
+        }
 
         private void LoadRequiredModules()
         {

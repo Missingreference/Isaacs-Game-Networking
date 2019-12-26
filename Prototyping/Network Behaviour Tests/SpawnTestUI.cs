@@ -111,7 +111,8 @@ public class SpawnTestUI : MonoBehaviour
             ((RectTransform)leftNetworkSquare.transform).sizeDelta = new Vector2(targetSize, targetSize * 0.7f);
 
             //Update Unique ID
-            leftNetworkSquare.uniqueID = uniqueID;
+            if(!leftNetworkSquare.isNetworkSpawned)
+                leftNetworkSquare.uniqueID = uniqueID;
         }
     }
 
@@ -128,7 +129,6 @@ public class SpawnTestUI : MonoBehaviour
         leftNetworkSquare.transform.localPosition = m_LeftObjectPositioner.rect.center;
 
         leftNetworkSquare.spawnOnNetworkInit = m_LeftSpawnInitToggle.isOn;
-        m_LeftOwnerUnspawnToggle.ison
 
         if(m_NetworkManager.isServer || leftNetworkSquare.isOwner)
         {
@@ -138,7 +138,7 @@ public class SpawnTestUI : MonoBehaviour
         {
             m_LeftDestroyToggle.isOn = leftNetworkSquare.destroyOnUnspawn;
         }
-        if(m_NetworkManager.isServer)
+        if(!m_NetworkManager.isRunning || m_NetworkManager.isServer)
         {
             leftNetworkSquare.ownerCanUnspawn = m_LeftOwnerUnspawnToggle.isOn;
         }

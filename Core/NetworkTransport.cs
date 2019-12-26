@@ -54,9 +54,9 @@ namespace Isaac.Network
         }
 
 		/// <summary>
-		/// Send a payload to the specified clientId, data and channelName.
+		/// Send a payload to the specified clientID, data and channelName.
 		/// </summary>
-		/// <param name="clientID">The clientId to send to</param>
+		/// <param name="clientID">The clientID to send to</param>
 		/// <param name="data">The data to send</param>
 		/// <param name="channel">The channel to send data to</param>
 		public abstract void Send(ulong clientID, ArraySegment<byte> data, byte channel);
@@ -86,7 +86,7 @@ namespace Isaac.Network
 		/// <summary>
 		/// Disconnects a client from the server
 		/// </summary>
-		/// <param name="clientID">The clientId to disconnect</param>
+		/// <param name="clientID">The clientID to disconnect</param>
 		public abstract void DisconnectRemoteClient(ulong clientID);
 
 		/// <summary>
@@ -97,7 +97,7 @@ namespace Isaac.Network
 		/// <summary>
 		/// Gets the round trip time for a specific client. This method is optional
 		/// </summary>
-		/// <param name="clientID">The clientId to get the rtt from</param>
+		/// <param name="clientID">The clientID to get the rtt from</param>
 		/// <returns>Returns the round trip time in milliseconds </returns>
 		public abstract ulong GetCurrentRtt(ulong clientID);
 
@@ -143,16 +143,18 @@ namespace Isaac.Network
             {
                 chosenChannelIndex = m_FreeChannels[0];
                 m_FreeChannels.RemoveAt(0);
+                m_Channels[chosenChannelIndex] = new TransportChannel() { name = channelName, channel = chosenChannelIndex, channelType = channelType };
             }
-            else if(m_Channels.Count >= 255)
+            else if(m_Channels.Count == byte.MaxValue)
             {
                 //Remember 0 is used for NETWORK_DEFAULT, 255 is invalid and whatever built-in channels being used by the Network Manager.
                 Debug.LogError("No channels left to register. A maximum of 255 channels can be registered.");
-                return 255; //Return invalid channel
+                return INVALID_CHANNEL; //Return invalid channel
             }
             else
             {
                 chosenChannelIndex = (byte)m_Channels.Count;
+                m_Channels.Add(new TransportChannel() { name = channelName, channel = chosenChannelIndex, channelType = channelType });
             }
 
             //Warn about unsupported channel type
@@ -162,7 +164,6 @@ namespace Isaac.Network
             }
 
             //Do register
-            m_Channels.Add(new TransportChannel() { name = channelName, channel = chosenChannelIndex, channelType = channelType });
             m_ChannelsByName.Add(channelName, chosenChannelIndex);
             m_ChannelCount++;
             return chosenChannelIndex;
@@ -175,6 +176,7 @@ namespace Isaac.Network
         /// <param name="channel"></param>
         public void UnregisterChannel(byte channel)
         {
+            Debug.Log("Attempting to unregister channel '" + channel + "'.");
             //Check if channel is valid and registered
             if(channel >= m_Channels.Count || channel == INVALID_CHANNEL || m_Channels[channel] == null)
             {
@@ -214,12 +216,12 @@ namespace Isaac.Network
         {
             if(channel >= m_Channels.Count || channel == 255)
             {
-                throw new ArgumentException("Channel '" + channel + "' is not registered or invalid.", nameof(channel));
+                throw new ArgumentException("Could not get channel name. Channel '" + channel + "' is not registered or invalid.", nameof(channel));
             }
             TransportChannel transportChannel = m_Channels[channel];
             if(transportChannel == null)
             {
-                throw new ArgumentException("Channel '" + channel + "' is not registered or invalid.", nameof(channel));
+                throw new ArgumentException("Could not get channel name. Channel '" + channel + "' is not registered or invalid.", nameof(channel));
             }
             return transportChannel.name;
         }
@@ -228,13 +230,15 @@ namespace Isaac.Network
         {
             if(channel >= m_Channels.Count || channel == 255)
             {
-                throw new ArgumentException("Channel '" + channel + "' is not registered or invalid.", nameof(channel));
+                Debug.Log("a1");
+                throw new ArgumentException("Could not get channel type. Channel '" + channel + "' is not registered or invalid.", nameof(channel));
             }
 
             TransportChannel transportChannel = m_Channels[channel];
             if(transportChannel == null)
             {
-                throw new ArgumentException("Channel '" + channel + "' is not registered or invalid.", nameof(channel));
+                Debug.Log("b2");
+                throw new ArgumentException("Could not get channel type. Channel '" + channel + "' is not registered or invalid.", nameof(channel));
             }
 
             return transportChannel.channelType;

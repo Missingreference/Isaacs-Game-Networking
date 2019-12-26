@@ -618,6 +618,37 @@ namespace Isaac.Network.Spawning
         }
 
 
+        private void CheckForDestroy(NetworkBehaviour networkBehaviour)
+        {
+#if DEBUG
+            if(ReferenceEquals(networkBehaviour, null))
+            {
+                //If this error occurs that means the target Network Behaviour is in fact null and not a valid reference to a destroyed Network Behaviour.
+                //If this occurs that means that somewhere code is incorrectly setting the reference to null or a null check is not occuring when its supposed to. Report this issue.
+                Debug.LogError("An internal issue occurred in the Network Behaviour Manager.");
+                return;
+            }
+#endif
+
+            //The behaviour has not been destroyed, continue as normal
+            if(networkBehaviour != null) return;
+
+
+            if(networkManager.isServer || (networkBehaviour.isOwner && networkBehaviour.ownerCanUnspawn)) //Server or allowed owners can destroy objects if they want but it's not the correct way of going about it
+            {
+                Debug.LogWarning("Network Behaviour has been destroyed before it was Unspawned. It is recommended that the Network Behaviour is unspawned on the network before being destroyed. For example calling UnspawnOnNetwork in OnDestroy. Unspawning now...");
+                UnspawnOnNetwork(networkBehaviour);
+                return;
+            }
+            else
+            {
+                //If you get this error then alter your logic so that the client will not be destroying the Network Behaviour. Further errors will occur because of this and will cause game breaking issues on the client.
+                //This issue can be partially bypassed by the server allowing this behaviour to be the owner and have the ownerCanUnspawn property enabled but the Network Behaviour should be unspawned before destroyed. Remember this should be a server authoritive game.
+                throw new NotServerException("The client has destroyed a ready and connected Network Behaviour when they are not supposed to. Only the server will manage destroying the Network Behaviour.");
+            }
+        }
+
+
         private readonly List<GameObject> m_SceneGameObjects = new List<GameObject>();
         private void OnSceneLoad(Scene scene, LoadSceneMode loadSceneMode)
         {
