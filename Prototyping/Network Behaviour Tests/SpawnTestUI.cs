@@ -5,10 +5,12 @@ using UnityEngine.UI;
 using TMPro;
 
 using Isaac.Network;
+using Isaac.Network.Exceptions;
 
 public class SpawnTestUI : MonoBehaviour
 {
 
+    //A short hand for setting the target network behaviour's unique ID
     public string uniqueID = "My Unique ID";
 
     
@@ -19,6 +21,7 @@ public class SpawnTestUI : MonoBehaviour
 
     //UI References
     private RectTransform m_LeftWindow;
+    private TextMeshProUGUI m_LeftTitleText;
     private Button m_LeftInstantiateButton;
     private Button m_LeftDestroyButton;
     private Button m_LeftSpawnButton;
@@ -35,6 +38,8 @@ public class SpawnTestUI : MonoBehaviour
     void Awake()
     {
         m_LeftWindow = (RectTransform)transform.Find("Left Window");
+
+        m_LeftTitleText = m_LeftWindow.Find("Title").GetComponent<TextMeshProUGUI>();
         m_LeftInstantiateButton = m_LeftWindow.Find("Instantiate Button").GetComponent<Button>();
         m_LeftInstantiateButton.onClick.AddListener(OnLeftInstantiateButtonPressed);
         m_LeftDestroyButton = m_LeftWindow.Find("Destroy Button").GetComponent<Button>();
@@ -68,6 +73,7 @@ public class SpawnTestUI : MonoBehaviour
     {
         if(leftNetworkSquare == null)
         {
+            m_LeftTitleText.text = "With Unique ID";
             m_LeftInstantiateButton.interactable = true;
             m_LeftDestroyButton.interactable = false;
             m_LeftSpawnButton.interactable = false;
@@ -76,6 +82,7 @@ public class SpawnTestUI : MonoBehaviour
         }
         else
         {
+            m_LeftTitleText.text = "With Unique ID : '" + (!string.IsNullOrWhiteSpace(leftNetworkSquare.uniqueID) ? leftNetworkSquare.uniqueID : "<BLANK UNIQUE ID>") + "'";
             m_LeftInstantiateButton.interactable = false;
             m_LeftDestroyButton.interactable = true;
             m_LeftSpawnButton.interactable = true;
@@ -125,6 +132,7 @@ public class SpawnTestUI : MonoBehaviour
     {
         //Create left network behaviour
         leftNetworkSquare = new GameObject("Network Square With Unique ID").AddComponent<NetworkUISquare>();
+        leftNetworkSquare.uniqueID = uniqueID;
         leftNetworkSquare.transform.SetParent(m_LeftObjectPositioner);
         leftNetworkSquare.transform.localPosition = m_LeftObjectPositioner.rect.center;
 
@@ -144,7 +152,7 @@ public class SpawnTestUI : MonoBehaviour
         }
         else
         {
-            m_LeftOwnerUnspawnToggle.isOn = leftNetworkSquare.ownerCanUnspawn;
+            m_LeftOwnerUnspawnToggle.SetIsOnWithoutNotify(leftNetworkSquare.ownerCanUnspawn);
         }
     }
 
@@ -185,7 +193,15 @@ public class SpawnTestUI : MonoBehaviour
     {
         if(leftNetworkSquare != null)
         {
-            leftNetworkSquare.ownerCanUnspawn = value;
+            try
+            {
+                leftNetworkSquare.ownerCanUnspawn = value;
+            }
+            catch(NotServerException ex)
+            {
+                m_LeftOwnerUnspawnToggle.SetIsOnWithoutNotify(leftNetworkSquare.ownerCanUnspawn);
+                throw ex;
+            }
         }
     }
 }

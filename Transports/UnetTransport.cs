@@ -2,11 +2,13 @@
 #pragma warning disable CS0618 // Missing XML comment for publicly visible type or member
 using System;
 using System.Collections.Generic;
-using MLAPI.Transports.Tasks;
-using UnityEngine.Networking;
-using Isaac.Network;
-using Unet = UnityEngine.Networking.NetworkTransport;
+
 using UnityEngine;
+using UnityEngine.Networking;
+using Unet = UnityEngine.Networking.NetworkTransport;
+
+using Isaac.Network;
+using Isaac.Network.Exceptions;
 
 namespace Isaac.Network.Transports
 {
@@ -28,20 +30,18 @@ namespace Isaac.Network.Transports
 		private WeakReference temporaryBufferReference;
 
 		// Lookup / translation
-		private int serverConnectionId;
-		private int serverHostId;
+		private int serverConnectionID;
+		private int serverHostID;
 
         //Unet has their own similar channel implementation so this simply gets the Unet channel equivalent of base NetworkTransport's channel.
         private Dictionary<byte, byte> m_UnetChannelLookup = new Dictionary<byte, byte>(); //key = NetworkTransport channel, value = Unet channel
         private Dictionary<byte, byte> m_TransportChannelLookup = new Dictionary<byte, byte>(); //key = Unet channel, value = NetworkTransport channel
 
-        private SocketTask connectTask;
-
 		public override ulong serverID => GetMLAPIClientID(0, 0, true);
 
 		public override void Send(ulong clientID, ArraySegment<byte> data, byte channel)
 		{
-			GetUnetConnectionDetails(clientID, out byte hostId, out ushort connectionId);
+			GetUnetConnectionDetails(clientID, out byte hostID, out ushort connectionID);
 
 			byte[] buffer;
 
@@ -74,14 +74,14 @@ namespace Isaac.Network.Transports
 			}
 
 			/*RelayTransport.*/
-			Unet.Send(hostId, connectionId, m_UnetChannelLookup[channel], buffer, data.Count, out byte error);
+			Unet.Send(hostID, connectionID, m_UnetChannelLookup[channel], buffer, data.Count, out byte error);
 		}
 
 		public override NetEventType PollEvent(out ulong clientID, out byte channel, out ArraySegment<byte> payload, out float receiveTime)
 		{
-			NetworkEventType eventType = Unet.Receive(out int hostId, out int connectionId, out int channelID, messageBuffer, messageBuffer.Length, out int receivedSize, out byte error);
+			NetworkEventType eventType = Unet.Receive(out int hostID, out int connectionID, out int channelID, messageBuffer, messageBuffer.Length, out int receivedSize, out byte error);
 
-			clientID = GetMLAPIClientID((byte)hostId, (ushort)connectionId, false);
+			clientID = GetMLAPIClientID((byte)hostID, (ushort)connectionID, false);
             if(channelID > 255 || channelID < 0)
             {
                 Debug.LogError("Received invalid Unet channel integer '" + channelID + "'.");
@@ -114,42 +114,12 @@ namespace Isaac.Network.Transports
 					temporaryBufferReference = new WeakReference(tempBuffer);
 				}
 
-				eventType = Unet.Receive(out hostId, out connectionId, out channelID, tempBuffer, tempBuffer.Length, out receivedSize, out error);
+				eventType = Unet.Receive(out hostID, out connectionID, out channelID, tempBuffer, tempBuffer.Length, out receivedSize, out error);
 				payload = new ArraySegment<byte>(tempBuffer, 0, receivedSize);
 			}
 			else
 			{
 				payload = new ArraySegment<byte>(messageBuffer, 0, receivedSize);
-			}
-
-			if (connectTask != null && hostId == serverHostId && connectionId == serverConnectionId)
-			{
-				if (eventType == NetworkEventType.ConnectEvent)
-				{
-					// We just got a response to our connect request.
-					connectTask.Message = null;
-					connectTask.SocketError = networkError == NetworkError.Ok ? System.Net.Sockets.SocketError.Success : System.Net.Sockets.SocketError.SocketError;
-					connectTask.State = null;
-					connectTask.Success = networkError == NetworkError.Ok;
-					connectTask.TransportCode = (byte)networkError;
-					connectTask.TransportException = null;
-					connectTask.IsDone = true;
-
-					connectTask = null;
-				}
-				else if (eventType == NetworkEventType.DisconnectEvent)
-				{
-					// We just got a response to our connect request.
-					connectTask.Message = null;
-					connectTask.SocketError = System.Net.Sockets.SocketError.SocketError;
-					connectTask.State = null;
-					connectTask.Success = false;
-					connectTask.TransportCode = (byte)networkError;
-					connectTask.TransportException = null;
-					connectTask.IsDone = true;
-
-					connectTask = null;
-				}
 			}
 
 			if (networkError == NetworkError.Timeout)
@@ -180,33 +150,18 @@ namespace Isaac.Network.Transports
         {
             if(NetworkManager.Get().enableLogging)
                 Debug.Log("Transport Start Client");
-            SocketTask task = SocketTask.Working;
+            //SocketTask task = SocketTask.Working;
 
-			serverHostId = Unet.AddHost(new HostTopology(GetConfig(), 1));
-			serverConnectionId = Unet.Connect(serverHostId, address, port, 0, out byte error);
+			serverHostID = Unet.AddHost(new HostTopology(GetConfig(), 1));
+			serverConnectionID = Unet.Connect(serverHostID, address, port, 0, out byte error);
 
 			NetworkError connectError = (NetworkError)error;
 
-			switch (connectError)
-			{
-				case NetworkError.Ok:
-					task.Success = true;
-					task.TransportCode = error;
-					task.SocketError = System.Net.Sockets.SocketError.Success;
-					task.IsDone = false;
-
-					// We want to continue to wait for the successful connect
-					connectTask = task;
-					break;
-				default:
-					task.Success = false;
-					task.TransportCode = error;
-					task.SocketError = System.Net.Sockets.SocketError.SocketError;
-					task.IsDone = true;
-					break;
-			}
-
-			//return task.AsTasks();
+            if(connectError != NetworkError.Ok)
+            {
+                //Throw Start Client failed exception
+                throw new NetworkException("Unet failed to start client with error '" + connectError + "'.");
+            }
 		}
 
 		public override void StartServer()
@@ -217,35 +172,33 @@ namespace Isaac.Network.Transports
 
 			if (SupportWebsocket)
             {
-                int websocketHostId = Unet.AddWebsocketHost(topology, ServerWebsocketListenPort);
+                int websocketHostID = Unet.AddWebsocketHost(topology, ServerWebsocketListenPort);
             }
 
-			int normalHostId = Unet.AddHost(topology, ServerListenPort);
-
-			//return SocketTask.Done.AsTasks();
+			int normalHostID = Unet.AddHost(topology, ServerListenPort);
 		}
 
-		public override void DisconnectRemoteClient(ulong clientId)
+		public override void DisconnectRemoteClient(ulong clientID)
         {
             if(NetworkManager.Get().enableLogging)
                 Debug.Log("Transport Disconnect Remote Client");
-            GetUnetConnectionDetails(clientId, out byte hostId, out ushort connectionId);
+            GetUnetConnectionDetails(clientID, out byte hostID, out ushort connectionID);
 
-			Unet.Disconnect((int)hostId, (int)connectionId, out byte error);
+			Unet.Disconnect((int)hostID, (int)connectionID, out byte error);
 		}
 
 		public override void DisconnectLocalClient()
         {
             if(NetworkManager.Get().enableLogging)
                 Debug.Log("Transport Disconnect Local Client");
-            Unet.Disconnect(serverHostId, serverConnectionId, out byte error);
+            Unet.Disconnect(serverHostID, serverConnectionID, out byte error);
 		}
 
-		public override ulong GetCurrentRtt(ulong clientId)
+		public override ulong GetCurrentRtt(ulong clientID)
 		{
-			GetUnetConnectionDetails(clientId, out byte hostId, out ushort connectionId);
+			GetUnetConnectionDetails(clientID, out byte hostID, out ushort connectionID);
 
-            return (ulong)Unet.GetCurrentRTT((int)hostId, (int)connectionId, out byte error);
+            return (ulong)Unet.GetCurrentRTT((int)hostID, (int)connectionID, out byte error);
         }
 
 		public override void Shutdown()
@@ -264,26 +217,26 @@ namespace Isaac.Network.Transports
 			Unet.Init();
 		}
 
-		public ulong GetMLAPIClientID(byte hostId, ushort connectionId, bool isServer)
+		public ulong GetMLAPIClientID(byte hostID, ushort connectionID, bool isServer)
 		{
 			if (isServer)
 			{
 				return 0;
             }
-            return ((ulong)connectionId | (ulong)hostId << 16) + 1;
+            return ((ulong)connectionID | (ulong)hostID << 16) + 1;
         }
 
-		public void GetUnetConnectionDetails(ulong clientId, out byte hostId, out ushort connectionId)
+		public void GetUnetConnectionDetails(ulong clientID, out byte hostID, out ushort connectionID)
 		{
-			if (clientId == 0)
+			if (clientID == 0)
 			{
-				hostId = (byte)serverHostId;
-				connectionId = (ushort)serverConnectionId;
+				hostID = (byte)serverHostID;
+				connectionID = (ushort)serverConnectionID;
 			}
 			else
 			{
-				hostId = (byte)((clientId - 1) >> 16);
-				connectionId = (ushort)((clientId - 1));
+				hostID = (byte)((clientID - 1) >> 16);
+				connectionID = (ushort)((clientID - 1));
 			}
 		}
 

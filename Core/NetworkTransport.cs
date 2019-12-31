@@ -126,14 +126,14 @@ namespace Isaac.Network
             if(string.IsNullOrWhiteSpace(channelName))
             {
                 Debug.LogError("Paramater channelName is null or whitespace.");
-                return 255; //Return invalid channel
+                return INVALID_CHANNEL; //Return invalid channel
             }
 
             //Check if the channel name is taken
             if(m_ChannelsByName.ContainsKey(channelName))
             {
                 Debug.LogError("Channel name '" + channelName + "' is already registered.");
-                return 255; //Return invalid channel
+                return INVALID_CHANNEL; //Return invalid channel
             }
 
             //Check if there are channels left
@@ -176,7 +176,6 @@ namespace Isaac.Network
         /// <param name="channel"></param>
         public void UnregisterChannel(byte channel)
         {
-            Debug.Log("Attempting to unregister channel '" + channel + "'.");
             //Check if channel is valid and registered
             if(channel >= m_Channels.Count || channel == INVALID_CHANNEL || m_Channels[channel] == null)
             {
@@ -214,7 +213,7 @@ namespace Isaac.Network
 
         public string GetChannelName(byte channel)
         {
-            if(channel >= m_Channels.Count || channel == 255)
+            if(channel >= m_Channels.Count || channel == INVALID_CHANNEL)
             {
                 throw new ArgumentException("Could not get channel name. Channel '" + channel + "' is not registered or invalid.", nameof(channel));
             }
@@ -228,7 +227,7 @@ namespace Isaac.Network
 
         public ChannelType GetChannelType(byte channel)
         {
-            if(channel >= m_Channels.Count || channel == 255)
+            if(channel >= m_Channels.Count || channel == INVALID_CHANNEL)
             {
                 Debug.Log("a1");
                 throw new ArgumentException("Could not get channel type. Channel '" + channel + "' is not registered or invalid.", nameof(channel));

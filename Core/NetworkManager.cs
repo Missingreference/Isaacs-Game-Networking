@@ -289,9 +289,18 @@ namespace Isaac.Network
 
 			Init();
 
-			transport.StartServer();
+            try
+            {
+                transport.StartServer();
+            }
+            catch(Exception ex)
+            {
+                Debug.LogError("The transport '" + transport.GetType().ToString() + "' ran into an internal issue when trying to start server. Shutting down and throwing exception...");
+                Shutdown();
+                throw ex;
+            }
 
-			isServer = true;
+            isServer = true;
 
             for(int i = 0; i < m_Modules.Count; i++)
             {
@@ -318,7 +327,16 @@ namespace Isaac.Network
 
 			Init();
 
-			transport.StartClient();
+            try
+            {
+                transport.StartClient();
+            }
+            catch(Exception ex)
+            {
+                Debug.LogError("The transport '" + transport.GetType().ToString() + "' ran into an internal issue when trying to start client. Shutting down and throwing exception...");
+                Shutdown();
+                throw ex;
+            }
 
 			isClient = true;
 
@@ -349,19 +367,23 @@ namespace Isaac.Network
 
 			Init();
 
-            transport.StartServer();
+            try
+            {
+                transport.StartServer();
+            }
+            catch(Exception ex)
+            {
+                Debug.LogError("The transport '" + transport.GetType().ToString() + "' ran into an internal issue when trying to start server. Shutting down and throwing exception...");
+                Shutdown();
+                throw ex;
+            }
 
 			isServer = true;
 			isClient = true;
 
 			ulong hostID = transport.serverID;
 
-			/*connectedClientsDictionary.Add(hostID, new NetworkedClient()
-			{
-				clientID = hostID
-			});*/
-
-            connectedClients.Add(hostID);//connectedClientsDictionary[hostID]);
+            connectedClients.Add(hostID);
 
             for(int i = 0; i < m_Modules.Count; i++)
             {
@@ -626,7 +648,16 @@ namespace Isaac.Network
 
 			transport.OnTransportEvent += HandleRawTransportPoll;
 
-			transport.Init();
+            try
+            {
+                transport.Init();
+            }
+            catch(Exception ex)
+            {
+                Debug.LogError("The transport '" + transport.GetType().ToString() + "' ran into an internal issue when trying to initialize. Shutting down and throwing exception...");
+                Shutdown();
+                throw ex;
+            }
 		}
 
         private void Shutdown()
@@ -642,8 +673,10 @@ namespace Isaac.Network
 
             if(transport != null)
             {
+                if(initialized)
+                    transport.Shutdown();
+
                 transport.OnTransportEvent -= HandleRawTransportPoll;
-                transport.Shutdown();
 
                 //Unregister required channels
                 if(transport.TryGetTransportChannel(networkInternalChannel, out _))
@@ -831,7 +864,7 @@ namespace Isaac.Network
 			}
 		}
 
-		internal void OnClientDisconnectFromServer(ulong disconnectingClientID)
+		private void OnClientDisconnectFromServer(ulong disconnectingClientID)
         {
             pendingClients.Remove(disconnectingClientID);
             connectedClients.Remove(disconnectingClientID);
@@ -853,7 +886,7 @@ namespace Isaac.Network
                 Debug.Log("Time synced");
 		}
 
-		internal void HandleApproval(ulong sendingClientID, bool approved)
+		private void HandleApproval(ulong sendingClientID, bool approved)
 		{
 			if (approved)
 			{

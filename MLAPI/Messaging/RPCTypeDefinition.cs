@@ -61,7 +61,6 @@ namespace MLAPI.Messaging
                        .Where(nextType => nextType.IsSubclassOf(typeof(NetworkBehaviour))).ToList();
                 for(int i = 0; i < networkBehaviourTypes.Count; i++)
                 {
-                    Debug.Log("Found NetworkBehaviour type: " + networkBehaviourTypes[i].ToString());
                     typeHashes.Add(networkBehaviourTypes[i].ToString().GetStableHash(NetworkManager.Get().config.rpcHashSize), networkBehaviourTypes[i]);
                 }
             }

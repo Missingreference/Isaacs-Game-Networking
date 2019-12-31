@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace Isaac.Network
 {
-    public partial class NetworkBehaviour : MonoBehaviour
+    public abstract partial class NetworkBehaviour : MonoBehaviour
     {
         /// <summary>
         /// Gets the client ID of the owner of this network behaviour.

@@ -71,7 +71,17 @@ namespace Isaac.Network
         /// <summary>
         /// Gets the ID of this object that is unique and synced across the network.
         /// </summary>
-        public ulong networkID { get; private set; }
+        public ulong networkID
+        {
+            get
+            {
+                if(!isNetworkReady)
+                {
+                    throw new NetworkException("Cannot get network ID. This Network Behaviour is not network ready.");
+                }
+                return m_NetworkID;
+            }
+        }
 
         /// <summary>
         /// Unique identifier for syncing across the network. Only used for trying to sync. Use Network ID for identifying a behaviour across the network. Setting this on the server won't send the clients it's details and won't assume that an exisitng object is trying to sync on the client.
@@ -190,6 +200,7 @@ namespace Isaac.Network
 
         private NetworkManager m_NetworkManager = null;
         private NetworkBehaviourManager m_NetworkBehaviourManager = null;
+        private ulong m_NetworkID = 0;
         private bool m_IsNetworkSpawned = false;
         private bool m_IsNetworkReady = false;
         private bool m_DestroyOnUnspawn = true;
@@ -231,20 +242,15 @@ namespace Isaac.Network
 
             if(isServer)
             {
-                m_NetworkBehaviourManager.SpawnOnNetwork(this, OnBehaviourConnected, OnBehaviourDisconnected, OnServerRPCReceived);
+                m_NetworkBehaviourManager.SpawnOnNetworkServer(this, OnBehaviourConnected, OnBehaviourDisconnected, OnServerRPCReceived);
             }
             else
             {
-                m_NetworkBehaviourManager.SpawnOnNetwork(this, OnBehaviourConnected, OnBehaviourDisconnected, OnClientRPCReceived);
+                m_NetworkBehaviourManager.SpawnOnNetworkClient(this, OnBehaviourConnected, OnBehaviourDisconnected, OnClientRPCReceived);
             }
             
             m_IsNetworkSpawned = true;
         }
-
-       // public void SpawnOnNetwork(ulong owner, bool ownerCanUnspawnSetting=false)
-        //{
-
-        //å}
 
         /// <summary>
         /// When this is called it will disconnect this Network Behaviour from the existing Network Behaviours across the network. Can only be called by the server or the owner of this Network Behaviour.
@@ -280,31 +286,50 @@ namespace Isaac.Network
         /// <summary>
         /// Called when this Network Behaviour successfully connects to a similar Network Behaviour across the network.
         /// </summary>
-        protected virtual void OnNetworkStart()
-        {
-
-
-        }
+        /// <param name="clientID">
+        /// The client/server that successfully connected behaviours across the network. Clients will only received the server's ID as the value.
+        /// </param>
+        protected virtual void OnNetworkReady(ulong clientID) { }
 
         /// <summary>
-        /// Called when this Network Behaviour disconnects from all Network Behaviours across the network.
+        /// Called when this Network Behaviour disconnects.
         /// </summary>
-        protected virtual void OnNetworkShutdown()
-        {
-            
-        }
+        protected virtual void OnNetworkShutdown() { }
 
-        private void OnBehaviourConnected(ulong newNetworkID, bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting)
+        //Server
+        private void OnBehaviourConnected(ulong newNetworkID, ulong clientID)
         {
-            networkID = newNetworkID;
+            m_NetworkID = newNetworkID;
+
+            //Update observers
+            m_PendingObservers.Remove(clientID);
+            m_Observers.Add(clientID);
+
+            //Set early since this will be called 
             m_IsNetworkSpawned = true;
             m_IsNetworkReady = true;
+
+            //Call Network start function
+            OnNetworkReady(clientID);
+        }
+
+        //Client
+        private void OnBehaviourConnected(ulong newNetworkID, bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting)
+        {
+            m_NetworkID = newNetworkID;
+
+            //Set early in case the Network Behaviour Manager remote
+            m_IsNetworkSpawned = true;
+            m_IsNetworkReady = true;
+
+            //Update Network Behaviour properties
             m_OwnerCanUnspawn = ownerCanUnspawnSetting;
             m_DestroyOnUnspawn = destroyOnUnspawnSetting;
 
-
-            OnNetworkStart();
+            //Call Network start function
+            OnNetworkReady(networkManager.serverID);
         }
+
 
         private void OnBehaviourDisconnected(bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting)
         {
@@ -314,11 +339,10 @@ namespace Isaac.Network
             m_IsNetworkReady = false;
             m_OwnerCanUnspawn = ownerCanUnspawnSetting;
             m_DestroyOnUnspawn = destroyOnUnspawnSetting;
-            networkID = 0;
+            m_NetworkID = 0;
 
             OnNetworkShutdown();
 
-            //Should this be before OnNetworkShutdown in case user calls Destroy in OnNetworkShutdown?
             if(destroyOnUnspawn && this != null)
             {
                 Destroy(gameObject);

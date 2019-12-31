@@ -23,7 +23,7 @@ public class RotatingNetworkObject : NetworkBehaviour
         transform.localScale = new Vector3(1.35f, 1.0f, 1.0f);
     }
 
-    protected override void OnNetworkStart()
+    protected override void OnNetworkReady(ulong clientID)
     {
         Debug.Log("On Network Start called");
     }

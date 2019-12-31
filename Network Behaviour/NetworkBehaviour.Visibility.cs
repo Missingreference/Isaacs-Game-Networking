@@ -7,161 +7,143 @@ using UnityEngine;
 
 using MLAPI.Serialization.Pooled;
 using MLAPI.Spawning;
+using Isaac.Network.Exceptions;
 
 namespace Isaac.Network
 {
-    public partial class NetworkBehaviour : MonoBehaviour
+    public abstract partial class NetworkBehaviour : MonoBehaviour
     {
 
-        internal readonly HashSet<ulong> observers = new HashSet<ulong>();
+        private readonly HashSet<ulong> m_Observers = new HashSet<ulong>();
+        private readonly HashSet<ulong> m_PendingObservers = new HashSet<ulong>();
 
         /// <summary>
-        /// Returns Observers enumerator
+        /// Returns Observers enumerator. Remember to use 'using' keyword or Dispose after use.
+        /// Server only.
         /// </summary>
         /// <returns>Observers enumerator</returns>
         public HashSet<ulong>.Enumerator GetObservers()
         {
-            throw new NotImplementedException();
-            /*
-            throw new NotImplementedException();
-
-            return observers.GetEnumerator();
-            */
+            if(!isServer)
+            {
+                throw new NotServerException("Function 'NetworkBehaviour.GetObservers' is not implemented for non-servers.");
+            }
+            return m_Observers.GetEnumerator();
         }
 
         /// <summary>
-        /// Whether or not this object is visible to a specific client
+        /// Returns the enumerator for pending observers that still need to be connected on the network.
+        /// Server only.
+        /// </summary>
+        /// <returns></returns>
+        public HashSet<ulong>.Enumerator GetPendingObservers()
+        {
+            if(!isServer)
+            {
+                throw new NotServerException("Function 'NetworkBehaviour.GetPendingObservers' is not implemented for non-servers.");
+            }
+            return m_PendingObservers.GetEnumerator();
+        }
+
+        /// <summary>
+        /// Whether or not this object is visible to a specific client.
+        /// Server only.
         /// </summary>
         /// <param name="clientID">The clientId of the client</param>
         /// <returns>True if the client knows about the object</returns>
         public bool IsNetworkVisibleTo(ulong clientID)
         {
-            throw new NotImplementedException();
-            /*
-
-            return observers.Contains(clientID);
-            */
+            if(!isServer)
+            {
+                throw new NotServerException("Function 'NetworkBehaviour.IsNetworkVisibleTo' is not implemented for non-servers.");
+            }
+            return m_Observers.Contains(clientID);
         }
 
         /// <summary>
-        /// Shows a previously hidden object to a client
+        /// Whether or not this object is still pending connection between Network Behaviours on a specific client.
+        /// Server only.
+        /// </summary>
+        /// <param name="clientID"></param>
+        /// <returns></returns>
+        public bool IsClientPendingSpawn(ulong clientID)
+        {
+            if(!isServer)
+            {
+                throw new NotServerException("Function 'NetworkBehaviour.IsClientPendingSpawn' is not implemented for non-servers.");
+            }
+            return m_PendingObservers.Contains(clientID);
+        }
+
+        /// <summary>
+        /// Spawns this Network Behaviour on a specific client that does not have visiblity on this client.
+        /// Server only.
         /// </summary>
         /// <param name="clientID">The client to show the object to</param>
-        /// <param name="payload">An optional payload to send as part of the spawn</param>
-        public void NetworkShow(ulong clientID, Stream payload = null)
+        public void NetworkShow(ulong clientID)
         {
-
-            throw new NotImplementedException();
-            /*
-
-            if(!NetworkManager.Get().isServer)
+            if(!isServer)
             {
-                //throw new NotServerException("Only server can change visibility");
-                Debug.LogError("Only server can change visibility.");
+                throw new NotServerException("Only the server can change visibility.");
+            }
+
+            if(m_Observers.Contains(clientID))
+            {
+                Debug.LogError("This Network Behaviour is already visible to client '" + clientID + "'.", this);
                 return;
             }
 
-            if(observers.Contains(clientID))
+            if(!isNetworkSpawned)
             {
-                //throw new VisibilityChangeException("The object is already visible");
-                Debug.LogError("The object is already visible.");
+                Debug.LogError("This Network Behaviour is not spawned on the network. Make sure this Network Behaviour is spawned using the NetworkBehaviour.SpawnOnNetwork function before changing it's visiblity ", this);
                 return;
             }
 
             // Send spawn call
-            observers.Add(clientID);
+            m_PendingObservers.Add(clientID);
 
-            SpawnManager.SendSpawnCallForObject(clientID, this, payload);
-            */
-        }
-
-        /// <summary>
-        /// Shows a list of previously hidden objects to a client
-        /// </summary>
-        /// <param name="networkedObjects">The objects to show</param>
-        /// <param name="clientID">The client to show the objects to</param>
-        /// <param name="payload">An optional payload to send as part of the spawns</param>
-        public static void NetworkShow(List<NetworkBehaviour> networkedObjects, ulong clientID, Stream payload = null)
-        {
             throw new NotImplementedException();
-            /*
-            if(!NetworkManager.Get().isServer)
-            {
-                //throw new NotServerException("Only server can change visibility");
-                Debug.LogError("Only server can change visibility.");
-                return;
-            }
-
-            // Do the safety loop first to prevent putting the MLAPI in an invalid state.
-            for(int i = 0; i < networkedObjects.Count; i++)
-            {
-                if(!false)//networkedObjects[i].IsSpawned)
-                {
-                    //throw new SpawnStateException("Object is not spawned");
-                    Debug.LogError("Object is not spawned.");
-                    return;
-                }
-
-                if(networkedObjects[i].observers.Contains(clientID))
-                {
-                    //throw new VisibilityChangeException("NetworkedObject with NetworkId: " + networkedObjects[i].NetworkId + " is already visible");
-                    Debug.LogError("NetworkedObject with NetworkId: " + networkedObjects[i].networkID + " is already visible");
-                    return;
-                }
-            }
-
-            using(PooledBitStream stream = PooledBitStream.Get())
-            {
-                using(PooledBitWriter writer = PooledBitWriter.Get(stream))
-                {
-                    writer.WriteUInt16Packed((ushort)networkedObjects.Count);
-                }
-
-                for(int i = 0; i < networkedObjects.Count; i++)
-                {
-                    // Send spawn call
-                    networkedObjects[i].observers.Add(clientID);
-
-                    SpawnManager.WriteSpawnCallForObject(stream, clientID, networkedObjects[i], payload);
-                }
-
-                //InternalMessageSender.SendToAll(MessageType.NETWORK_ADD_OBJECTS, "NETWORK_INTERNAL", stream);
-            }*/
+            //SpawnManager.SendSpawnCallForObject(clientID, this, payload);
         }
 
         /// <summary>
-        /// Hides a object from a specific client
+        /// Hides a object from a specific client.
+        /// Server only.
         /// </summary>
         /// <param name="clientID">The client to hide the object for</param>
         public void NetworkHide(ulong clientID)
         {
-            throw new NotImplementedException();
-            /*
+            
             if(!NetworkManager.Get().isServer)
             {
-                //throw new NotServerException("Only server can change visibility");
-                Debug.LogError("Only server can change visibility.");
-                return;
+                throw new NotServerException("Only the server can change visibility.");
             }
 
-            if(!observers.Contains(clientID))
+            if(!m_Observers.Contains(clientID))
             {
-                //throw new VisibilityChangeException("The object is already hidden");
-                Debug.LogError("The object is already hidden.");
+                Debug.LogError("This Network Behaviour is already not visible to client '" + clientID + "'.", this);
                 return;
             }
 
             if(clientID == NetworkManager.Get().serverID)
             {
-                //throw new VisibilityChangeException("Cannot hide an object from the server");
                 Debug.LogError("Cannot hide an object from the server.");
                 return;
             }
 
+            if(!isNetworkSpawned)
+            {
+                Debug.LogError("This Network Behaviour is not spawned on the network. Make sure this Network Behaviour is spawned using the NetworkBehaviour.SpawnOnNetwork function before changing it's visiblity ", this);
+                return;
+            }
 
             // Send destroy call
-            observers.Remove(clientID);
+            m_Observers.Remove(clientID);
+            m_PendingObservers.Remove(clientID);
 
+            throw new NotImplementedException();
+
+            /*
             using(PooledBitStream stream = PooledBitStream.Get())
             {
                 using(PooledBitWriter writer = PooledBitWriter.Get(stream))
@@ -170,68 +152,6 @@ namespace Isaac.Network
 
                     //InternalMessageSender.SendToAll(MessageType.NETWORK_DESTROY_OBJECT, "NETWORK_INTERNAL", stream);
                 }
-            }
-            */
-        }
-
-        /// <summary>
-        /// Hides a list of objects from a client
-        /// </summary>
-        /// <param name="networkedObjects">The objects to hide</param>
-        /// <param name="clientID">The client to hide the objects from</param>
-        public static void NetworkHide(List<NetworkBehaviour> networkedObjects, ulong clientID)
-        {
-            throw new NotImplementedException();
-            /*
-            if(!NetworkManager.Get().isServer)
-            {
-                //throw new NotServerException("Only server can change visibility");
-                Debug.LogError("Only the server can change visibility.");
-                return;
-            }
-
-            if(clientID == NetworkManager.Get().serverID)
-            {
-                //throw new VisibilityChangeException("Cannot hide an object from the server");
-                Debug.LogError("Cannot hide an object from the server.");
-                return;
-            }
-
-            // Do the safety loop first to prevent putting the MLAPI in an invalid state.
-            for(int i = 0; i < networkedObjects.Count; i++)
-            {
-                if(!true)//networkedObjects[i].IsSpawned)
-                {
-                    //throw new SpawnStateException("Object is not spawned");
-                    Debug.LogError("Object is not spawned.");
-                    return;
-                }
-
-                if(!networkedObjects[i].observers.Contains(clientID))
-                {
-                    //throw new VisibilityChangeException("NetworkedObject with NetworkId: " + networkedObjects[i].NetworkId + " is already hidden");
-                    Debug.LogError("NetworkedObject with NetworkId: " + networkedObjects[i].networkID + " is already hidden");
-                    return;
-                }
-            }
-
-
-            using(PooledBitStream stream = PooledBitStream.Get())
-            {
-                using(PooledBitWriter writer = PooledBitWriter.Get(stream))
-                {
-                    writer.WriteUInt16Packed((ushort)networkedObjects.Count);
-
-                    for(int i = 0; i < networkedObjects.Count; i++)
-                    {
-                        // Send destroy call
-                        networkedObjects[i].observers.Remove(clientID);
-
-                        writer.WriteUInt64Packed(networkedObjects[i].networkID);
-                    }
-                }
-
-                //InternalMessageSender.SendToAll(MessageType.NETWORK_DESTROY_OBJECTS, "NETWORK_INTERNAL", stream);
             }
             */
         }

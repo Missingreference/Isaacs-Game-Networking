@@ -27,7 +27,7 @@ public class NetworkUISquare : NetworkBehaviour
 
     void Start()
     {
-        
+
     }
 
     void Update()

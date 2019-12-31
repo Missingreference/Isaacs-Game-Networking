@@ -19,12 +19,11 @@ namespace Isaac.Network.Spawning
     public class NetworkBehaviourManager : NetworkModule
     {
         //Message types
-        public byte addObjectMessageType { get; private set; } = (byte)MessageType.INVALID;
+        public byte spawnMessageType { get; private set; } = (byte)MessageType.INVALID;
+        public byte unspawnMessageType { get; private set; } = (byte)MessageType.INVALID;
         public byte objectSuccessMessageType { get; private set; } = (byte)MessageType.INVALID;
-        public byte destroyObjectMessageType { get; private set; } = (byte)MessageType.INVALID;
         public byte clientRPCMessageType { get; private set; } = (byte)MessageType.INVALID;
         public byte serverRPCMessageType { get; private set; } = (byte)MessageType.INVALID;
-        public byte objectUnspawnMessageType { get; private set; } = (byte)MessageType.INVALID;
 
         public readonly List<NetworkBehaviourReference> networkBehaviours = new List<NetworkBehaviourReference>();
         //ulong = networkID
@@ -32,12 +31,10 @@ namespace Isaac.Network.Spawning
 
         public override Type[] dependencies => new Type[] { typeof(NetworkMessageHandler) };
 
-        public delegate void NetworkBehaviourConnectedDelegate(ulong networkID, bool ownerCanUnspawn, bool destroyOnUnspawn);
-        public delegate void NetworkBehaviourDisconnectedDelegate(bool ownerCanUnspawn, bool destroyOnUnspawn);
+        public delegate void ServerBehaviourConnectedDelegate(ulong networkID, ulong clientID);
+        public delegate void ClientBehaviourConnectedDelegate(ulong networkID, bool ownerCanUnspawn, bool destroyOnUnspawn);
+        public delegate void BehaviourDisconnectedDelegate(bool ownerCanUnspawn, bool destroyOnUnspawn);
         public delegate void NetworkBehaviourRPCDelegate(ulong hash, ulong senderClientID, Stream stream);
-
-        //private readonly Dictionary<NetworkBehaviour, NetworkBehaviourConnectedDelegate> m_ConnectedDelegates = new Dictionary<NetworkBehaviour, NetworkBehaviourConnectedDelegate>();
-        //private readonly Dictionary<NetworkBehaviour, NetworkBehaviourDisconnectedDelegate> m_DisconnectedDelegates = new Dictionary<NetworkBehaviour, NetworkBehaviourDisconnectedDelegate>();
 
         //Network ID Management
         private ulong m_NetworkIDCounter = 0;
@@ -64,9 +61,9 @@ namespace Isaac.Network.Spawning
             if(m_NetworkMessageHandler == null)
             {
                 m_NetworkMessageHandler = loadedDependencies[0] as NetworkMessageHandler;
-                addObjectMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_ADD_OBJECT", HandleAddObjectMessage, NetworkMessageHandler.NetworkMessageReceiver.Client);
+                spawnMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_SPAWN_OBJECT", HandleSpawnMessage, NetworkMessageHandler.NetworkMessageReceiver.Client);
+                unspawnMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_UNSPAWN_OBJECT", HandleUnspawnMessage, NetworkMessageHandler.NetworkMessageReceiver.Client);
                 objectSuccessMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_OBJECT_SUCCESS", HandleObjectSuccessMessage, NetworkMessageHandler.NetworkMessageReceiver.Server);
-                destroyObjectMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_DESTRYOY_OBJECT", HandleDestroyObjectMessage, NetworkMessageHandler.NetworkMessageReceiver.Client);
                 clientRPCMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_CLIENT_RPC", HandleClientRPCMessage, NetworkMessageHandler.NetworkMessageReceiver.Client);
                 serverRPCMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_SERVER_RPC", HandleServerRPCMessage, NetworkMessageHandler.NetworkMessageReceiver.Server);
             }
@@ -77,8 +74,6 @@ namespace Isaac.Network.Spawning
             m_LocalPendingBehaviours.Clear();
             m_RemotePendingBehaviours.Clear();
             m_LocalPendingBehavioursList.Clear();
-            //m_ConnectedDelegates.Clear();
-            //m_DisconnectedDelegates.Clear();
             m_HashedStrings.Clear();
             SceneManager.sceneLoaded += OnSceneLoad;
         }
@@ -104,10 +99,7 @@ namespace Isaac.Network.Spawning
 
         public override void Shutdown()
         {
-            Debug.Log("Shutdown on Manager called");
-
             //Shutdown all Network Behaviours
-            //KeyValuePair<NetworkBehaviour, NetworkBehaviourDisconnectedDelegate>[] pairs = m_DisconnectedDelegates.ToArray();
             for(int i = 0; i < networkBehaviours.Count; i++)
             {
                 if(networkBehaviours[i].networkBehaviour.isNetworkSpawned)
@@ -118,21 +110,27 @@ namespace Isaac.Network.Spawning
                 if(m_LocalPendingBehavioursList[i].isNetworkSpawned)
                     m_LocalPendingBehavioursList[i].UnspawnOnNetwork();
             }
+            SceneManager.sceneLoaded -= OnSceneLoad;
         }
 
-        public void SpawnOnNetwork(NetworkBehaviour behaviour, NetworkBehaviourConnectedDelegate connectedDelegate, NetworkBehaviourDisconnectedDelegate disconnectedDelegate, NetworkBehaviourRPCDelegate localRPCDelegate)
+        //Server only
+        public void SpawnOnNetworkServer(NetworkBehaviour behaviour, ServerBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectCallback, NetworkBehaviourRPCDelegate localRPCCallback)
         {
+            if(!networkManager.isServer)
+            {
+                throw new NotServerException("Only the server can call this function.");
+            }
+
             if(behaviour == null)
             {
-                //Debug.LogError("Network Behaviour parameter cannot be null.");
-                //return;
                 throw new ArgumentNullException(nameof(behaviour));
             }
 
+            //Check if the target behaviour has been destroyed
+            CheckForDestroy(behaviour);
+
             if(behaviour.isNetworkReady)
             {
-                //Debug.LogError("Target Network Behaviour is already spawned and connected on the network.", behaviour);
-                //return;
                 throw new ArgumentException("Network Behaviour is already spawned and connected on the network.", nameof(behaviour));
             }
 
@@ -143,90 +141,17 @@ namespace Isaac.Network.Spawning
 
             if(m_LocalPendingBehavioursList.Contains(behaviour))
             {
-                //Debug.LogError("Target Network Behaviour is already spawned on the network.", behaviour);
-                //return;
                 throw new ArgumentException("Network Behaviour is already spawned on the network.", nameof(behaviour));
             }
+            ulong newNetworkID = GetNewNetworkID();
+            ulong? uniqueHash = string.IsNullOrWhiteSpace(behaviour.uniqueID) ? null : behaviour.uniqueID?.GetStableHash(networkManager.config.rpcHashSize);
 
-            if(networkManager.isServer) //Server
+            if(uniqueHash != null)
             {
-                ulong newNetworkID = GetNewNetworkID();
-                ulong? uniqueHash = string.IsNullOrWhiteSpace(behaviour.uniqueID) ? null : behaviour.uniqueID?.GetStableHash(networkManager.config.rpcHashSize);
-                
-                if(uniqueHash != null)
+                //Check if the unique hash has already been added.
+                if(networkBehaviourDictionary.ContainsKey(uniqueHash.Value))
                 {
-                    //Check if the unique hash has already been added.
-                    if(m_LocalPendingBehaviours.ContainsKey(uniqueHash.Value))
-                    {
-                        if(m_HashedStrings[uniqueHash.Value] == behaviour.uniqueID)
-                        {
-                            Debug.LogError("A Network Behaviour already has the unique ID '" + behaviour.uniqueID + "'.");
-                            behaviour.UnspawnOnNetwork();
-                            return;
-                        }
-                        else
-                        {
-                            //This occurs when 2 different strings hash to the same value from MLAPI.Hashing.GetStableHash.
-                            Debug.LogError("A hash collision occurred. Either change the unique ID or increase the hash size in the config. '" + behaviour.uniqueID + "' and '" + m_HashedStrings[uniqueHash.Value] + "' both hashed to '" + uniqueHash + "'.");
-                            behaviour.UnspawnOnNetwork();
-                            return;
-                        }
-                    }
-                    m_HashedStrings.Add(uniqueHash.Value, behaviour.uniqueID);
-                }
-
-                //m_ConnectedDelegates.Add(behaviour, connectedDelegate);
-                //m_DisconnectedDelegates.Add(behaviour, disconnectedDelegate);
-                m_LocalPendingBehaviours.Add(newNetworkID, new PendingNetworkBehaviour { uniqueHash = uniqueHash, isRemoteBehaviour = false, networkID = newNetworkID, reference = new NetworkBehaviourReference { networkBehaviour = behaviour, connectedDelegate = connectedDelegate, disconnectedDelegate = disconnectedDelegate, localRPCDelegate =  localRPCDelegate} });
-                m_LocalPendingBehavioursList.Add(behaviour);
-
-
-                //Since were the server, send to all clients the spawning Network Behaviour
-                using(PooledBitStream stream = PooledBitStream.Get())
-                {
-                    using(PooledBitWriter writer = PooledBitWriter.Get(stream))
-                    {
-                        //Write behaviour info and type
-                        writer.WriteUInt64Packed(newNetworkID);
-                        writer.WriteUInt64Packed(behaviour.ownerClientID);
-                        writer.WriteUInt64Packed(RPCTypeDefinition.GetHashFromType(behaviour.GetType()));
-                        writer.WriteBool(uniqueHash != null);
-                        if(uniqueHash != null)
-                            writer.WriteUInt64Packed(uniqueHash.Value);
-                        Debug.Log("Sending to clients the new behaviour " + behaviour.GetType());
-                    }
-
-                    MessageSender.SendToAll(addObjectMessageType, networkManager.networkInternalChannel, stream);
-                }
-            }
-            else //Client
-            {
-                //Check if this is the Unique Behaviour being spawned in HandleAddObjectMessage where the Unique ID is blank and SpawnOnNetwork is called in Awake.;'
-                if(m_TrackAwakeSpawns)
-                {
-                    m_BehavioursAwaitingSpawn.Enqueue(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedDelegate = connectedDelegate, disconnectedDelegate = disconnectedDelegate, localRPCDelegate = localRPCDelegate });
-                    return;
-                }
-
-                //Check for valid unique ID
-                //Only the server can create Network Behaviours with an empty uniqueID
-                //or else the game will no longer be server-authenticated and secure.
-                if(string.IsNullOrWhiteSpace(behaviour.uniqueID))
-                {
-                    throw new NotServerException("Only the server can create Network Behaviours with an empty uniqueID or else clients can do willy-nilly(technical term) across the network.");
-                }
-
-                ulong uniqueHash = behaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize);
-                Debug.Log("Created Hash: " + uniqueHash);
-                PendingNetworkBehaviour pendingBehaviour;
-                if(m_RemotePendingBehaviours.TryGetValue(uniqueHash, out pendingBehaviour))
-                {
-                    OnObjectConnectSuccess(pendingBehaviour, pendingBehaviour.networkID);
-                }
-                else if(m_LocalPendingBehaviours.TryGetValue(uniqueHash, out pendingBehaviour))
-                {
-                    //Check if the unique hash has already been added by this client
-                    if(m_HashedStrings[uniqueHash] == behaviour.uniqueID)
+                    if(m_HashedStrings[uniqueHash.Value] == behaviour.uniqueID)
                     {
                         Debug.LogError("A Network Behaviour already has the unique ID '" + behaviour.uniqueID + "'.");
                         behaviour.UnspawnOnNetwork();
@@ -235,43 +160,128 @@ namespace Isaac.Network.Spawning
                     else
                     {
                         //This occurs when 2 different strings hash to the same value from MLAPI.Hashing.GetStableHash.
-                        Debug.LogError("A hash collision occurred. Either change the unique ID or increase the hash size in the config. '" + behaviour.uniqueID + "' and '" + m_HashedStrings[uniqueHash] + "' both hashed to '" + uniqueHash + "'.");
+                        Debug.LogError("A hash collision occurred. Either change the unique ID or increase the hash size in the config. '" + behaviour.uniqueID + "' and '" + m_HashedStrings[uniqueHash.Value] + "' both hashed to '" + uniqueHash + "'.");
                         behaviour.UnspawnOnNetwork();
                         return;
                     }
                 }
+                m_HashedStrings.Add(uniqueHash.Value, behaviour.uniqueID);
+            }
+
+            networkBehaviours.Add(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedServerCallback = connectedCallback, disconnectedDelegate = disconnectCallback, localRPCDelegate = localRPCCallback });
+            networkBehaviourDictionary.Add(newNetworkID, networkBehaviours[networkBehaviours.Count - 1]);
+
+            //Since were the server, send to all clients the spawning Network Behaviour
+            using(PooledBitStream stream = PooledBitStream.Get())
+            {
+                using(PooledBitWriter writer = PooledBitWriter.Get(stream))
+                {
+                    //Write behaviour info and type
+                    writer.WriteUInt64Packed(newNetworkID);
+                    writer.WriteUInt64Packed(behaviour.ownerClientID);
+                    writer.WriteUInt64Packed(RPCTypeDefinition.GetHashFromType(behaviour.GetType()));
+                    writer.WriteBool(uniqueHash != null);
+                    if(uniqueHash != null)
+                        writer.WriteUInt64Packed(uniqueHash.Value);
+                    Debug.Log("Sending to clients the new behaviour " + behaviour.GetType());
+                }
+
+                MessageSender.SendToAll(spawnMessageType, networkManager.networkInternalChannel, stream);
+            }
+
+            networkBehaviours[networkBehaviours.Count - 1].connectedServerCallback.Invoke(newNetworkID, networkManager.serverID);
+        }
+
+        //Client only
+        public void SpawnOnNetworkClient(NetworkBehaviour behaviour, ClientBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectedCallback, NetworkBehaviourRPCDelegate localRPCCallback)
+        {
+            if(networkManager.isServer)
+            {
+                throw new NotClientException("Only a non-server client can call this function.");
+            }
+
+            if(behaviour == null)
+            {
+                throw new ArgumentNullException(nameof(behaviour));
+            }
+
+            //Check if the target behaviour has been destroyed
+            CheckForDestroy(behaviour);
+
+            if(behaviour.isNetworkReady)
+            {
+                throw new ArgumentException("Network Behaviour is already spawned and connected on the network.", nameof(behaviour));
+            }
+
+            if(behaviour.isNetworkSpawned)
+            {
+                throw new ArgumentException("Network Behaviour is already spawned.", nameof(behaviour));
+            }
+
+            if(m_LocalPendingBehavioursList.Contains(behaviour))
+            {
+                throw new ArgumentException("Network Behaviour is already spawned on the network.", nameof(behaviour));
+            }
+
+            //Check if this is the Unique Behaviour being spawned in HandleAddObjectMessage where the Unique ID is blank and SpawnOnNetwork is called in Awake.;'
+            if(m_TrackAwakeSpawns)
+            {
+                m_BehavioursAwaitingSpawn.Enqueue(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback });
+                return;
+            }
+
+            //Check for valid unique ID
+            //Only the server can create Network Behaviours with an empty uniqueID
+            //or else the game will no longer be server-authenticated and secure.
+            if(string.IsNullOrWhiteSpace(behaviour.uniqueID))
+            {
+                throw new NotServerException("Only the server can create Network Behaviours with an empty uniqueID or else clients can do willy-nilly(technical term) across the network.");
+            }
+
+            ulong uniqueHash = behaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize);
+            Debug.Log("Created Hash: " + uniqueHash);
+            if(m_RemotePendingBehaviours.TryGetValue(uniqueHash, out PendingNetworkBehaviour pendingBehaviour))
+            {
+                m_RemotePendingBehaviours.Remove(uniqueHash);
+                OnObjectConnectSuccess(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback }, pendingBehaviour.networkID, pendingBehaviour.ownerCanUnspawn, pendingBehaviour.destroyOnUnspawn);
+            }
+            else if(m_LocalPendingBehaviours.TryGetValue(uniqueHash, out pendingBehaviour))
+            {
+                //Check if the unique hash has already been added by this client
+                if(m_HashedStrings[uniqueHash] == behaviour.uniqueID)
+                {
+                    Debug.LogError("A Network Behaviour already has the unique ID '" + behaviour.uniqueID + "'.");
+                    behaviour.UnspawnOnNetwork();
+                    return;
+                }
                 else
                 {
-                    //Add to pending
-                    pendingBehaviour = new PendingNetworkBehaviour() { isRemoteBehaviour = false, uniqueHash = uniqueHash, ownerID = networkManager.serverID, networkID = 0, reference = new NetworkBehaviourReference { networkBehaviour = behaviour, connectedDelegate = connectedDelegate, disconnectedDelegate = disconnectedDelegate, localRPCDelegate = localRPCDelegate }};
-                    m_LocalPendingBehavioursList.Add(pendingBehaviour.reference.networkBehaviour);
-                    m_LocalPendingBehaviours.Add(uniqueHash, pendingBehaviour);
-                    m_HashedStrings.Add(uniqueHash, behaviour.uniqueID);
+                    //This occurs when 2 different strings hash to the same value from MLAPI.Hashing.GetStableHash.
+                    Debug.LogError("A hash collision occurred. Either change the unique ID or increase the hash size in the config. '" + behaviour.uniqueID + "' and '" + m_HashedStrings[uniqueHash] + "' both hashed to '" + uniqueHash + "'.");
+                    behaviour.UnspawnOnNetwork();
+                    return;
                 }
+            }
+            else
+            {
+                //Add to pending
+                pendingBehaviour = new PendingNetworkBehaviour() { isRemoteBehaviour = false, uniqueHash = uniqueHash, ownerID = networkManager.serverID, networkID = 0, reference = new NetworkBehaviourReference { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback } };
+                m_LocalPendingBehavioursList.Add(pendingBehaviour.reference.networkBehaviour);
+                m_LocalPendingBehaviours.Add(uniqueHash, pendingBehaviour);
+                m_HashedStrings.Add(uniqueHash, behaviour.uniqueID);
             }
         }
 
         public void UnspawnOnNetwork(NetworkBehaviour behaviour)
         {
-            Debug.Log("UnspawnOnNetwork on Manager called");
-            if(behaviour.Equals(null))
+            if(behaviour == null && ReferenceEquals(behaviour, null))
             {
                 throw new ArgumentNullException(nameof(behaviour));
-                //Debug.LogError("Network Behaviour parameter cannot be null.");
-                //return;
-            }
-
-            if(behaviour == null)
-            {
-                Debug.Log("Destroyed.");
-                //return;
             }
 
             if(!behaviour.isNetworkSpawned)
             {
                 throw new ArgumentException("Unable to unspawn. Target behaviour is not spawned.", nameof(behaviour));
-                //Debug.LogError("Unable to unspawn. Target behaviour is not spawned.", behaviour);
-                //return;
             }
 
             if(networkManager.isServer)
@@ -283,14 +293,21 @@ namespace Isaac.Network.Spawning
                     {
                         writer.WriteUInt64Packed(behaviour.networkID);
                         writer.WriteBool(behaviour.destroyOnUnspawn);
-                        Debug.Log("Sending to clients the destroyed message for behaviour " + behaviour.GetType());
+                        Debug.Log("Sending to clients the destroy message for behaviour " + behaviour.GetType());
                     }
 
-                    MessageSender.SendToAll(destroyObjectMessageType, networkManager.networkInternalChannel, stream);
+                    MessageSender.SendToAll(unspawnMessageType, networkManager.networkInternalChannel, stream);
                 }
 
                 //Do unspawn
-                DoLocalUnspawn(networkBehaviourDictionary[behaviour.networkID], behaviour.destroyOnUnspawn);
+                if(behaviour.isNetworkReady)
+                {
+                    DoLocalUnspawn(networkBehaviourDictionary[behaviour.networkID], behaviour.destroyOnUnspawn);
+                }
+                else
+                {
+
+                }
             }
             else //Client
             {
@@ -322,20 +339,33 @@ namespace Isaac.Network.Spawning
             Debug.Log("Do Local Unspawn called");
             networkBehaviours.Remove(behaviourReference);
             networkBehaviourDictionary.Remove(behaviourReference.networkBehaviour.networkID);
+            if(!string.IsNullOrWhiteSpace(behaviourReference.networkBehaviour.uniqueID))
+            {
+                m_HashedStrings.Remove(behaviourReference.networkBehaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize));
+            }
             behaviourReference.disconnectedDelegate.Invoke(behaviourReference.networkBehaviour.ownerCanUnspawn, destroy);
-            //m_HashedStrings.
         }
 
+        //Do unspawn on pending behaviour
+        //Client only
         private void DoLocalUnspawn(PendingNetworkBehaviour pendingBehaviour, bool destroy)
         {
             Debug.Log("Do Local Unspawn Pending called");
             if(networkManager.isServer)
+            {
                 m_LocalPendingBehaviours.Remove(pendingBehaviour.networkID);
+            }
             else
+            {
                 m_LocalPendingBehaviours.Remove(pendingBehaviour.uniqueHash.Value);
+            }
+
+            if(pendingBehaviour.uniqueHash != null)
+            {
+                m_HashedStrings.Remove(pendingBehaviour.uniqueHash.Value);
+            }
             m_LocalPendingBehavioursList.Remove(pendingBehaviour.reference.networkBehaviour);
             pendingBehaviour.reference.disconnectedDelegate.Invoke(pendingBehaviour.reference.networkBehaviour.ownerCanUnspawn, destroy);
-            //m_HashedStrings.Remove(hash);
         }
 
         //Only the server can create new network IDs
@@ -382,7 +412,7 @@ namespace Isaac.Network.Spawning
                             Debug.Log("Sending to new client the existing behaviour '" + networkBehaviours[i].GetType() + "'.");
                         }
 
-                        MessageSender.SendToAll(addObjectMessageType, networkManager.networkInternalChannel, stream);
+                        MessageSender.SendToAll(spawnMessageType, networkManager.networkInternalChannel, stream);
                     }
                 }
 
@@ -414,7 +444,7 @@ namespace Isaac.Network.Spawning
                             Debug.Log("Sending to new client the existing behaviour '" + values[i].reference.networkBehaviour.GetType() + "'.");
                         }
 
-                        MessageSender.SendToAll(addObjectMessageType, networkManager.networkInternalChannel, stream);
+                        MessageSender.SendToAll(spawnMessageType, networkManager.networkInternalChannel, stream);
                     }
                 }
             }
@@ -426,7 +456,7 @@ namespace Isaac.Network.Spawning
         private bool m_TrackAwakeSpawns = false;
         private Queue<NetworkBehaviourReference> m_BehavioursAwaitingSpawn = new Queue<NetworkBehaviourReference>();
 
-        public void HandleAddObjectMessage(ulong clientID, Stream stream, float receiveTime)
+        public void HandleSpawnMessage(ulong clientID, Stream stream, float receiveTime)
         {
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
@@ -443,15 +473,20 @@ namespace Isaac.Network.Spawning
                     Debug.Log("Received add object with Network ID: " + networkID);
                     ulong uniqueHash = reader.ReadUInt64Packed(); //Unique hash ID
                     Debug.Log("Received Hash: " + uniqueHash);
-                    PendingNetworkBehaviour pendingBehaviour;
-                    if(m_LocalPendingBehaviours.TryGetValue(uniqueHash, out pendingBehaviour))
+                    if(m_LocalPendingBehaviours.TryGetValue(uniqueHash, out PendingNetworkBehaviour pendingBehaviour))
                     {
                         if(pendingBehaviour.reference.networkBehaviour.GetType() != behaviourType)
                         {
                             Debug.LogError("Received add object message where the remote network behaviour type(" + behaviourType.ToString() + ") does not match up with local network behaviour type (" + pendingBehaviour.reference.networkBehaviour.GetType() + ") with same unique ID(" + pendingBehaviour.reference.networkBehaviour.uniqueID + ").", pendingBehaviour.reference.networkBehaviour);
                             return;
                         }
-                        OnObjectConnectSuccess(pendingBehaviour, networkID);
+
+                        //Clean up pending
+                        m_LocalPendingBehaviours.Remove(uniqueHash);
+                        m_LocalPendingBehavioursList.Remove(pendingBehaviour.reference.networkBehaviour);
+                        m_HashedStrings.Remove(uniqueHash);
+
+                        OnObjectConnectSuccess(pendingBehaviour.reference, networkID, ownerCanUnspawn, destroyOnUnspawn);
                     }
                     else if(m_RemotePendingBehaviours.ContainsKey(uniqueHash))
                     {
@@ -482,9 +517,9 @@ namespace Isaac.Network.Spawning
                         NetworkBehaviourReference reference = m_BehavioursAwaitingSpawn.Dequeue();
                         if(reference.networkBehaviour == serverBehaviour)
                         {
-                            OnObjectConnectSuccess(new PendingNetworkBehaviour() { reference = reference, networkID = networkID, ownerID = ownerID, destroyOnUnspawn = destroyOnUnspawn, isRemoteBehaviour = false, uniqueHash = null, ownerCanUnspawn = ownerCanUnspawn }, networkID);
+                            OnObjectConnectSuccess(reference, networkID, ownerCanUnspawn, destroyOnUnspawn);
                         }
-                        SpawnOnNetwork(reference.networkBehaviour, reference.connectedDelegate, reference.disconnectedDelegate, reference.localRPCDelegate);
+                        SpawnOnNetworkClient(reference.networkBehaviour, reference.connectedClientCallback, reference.disconnectedDelegate, reference.localRPCDelegate);
                     }
                 }
             }
@@ -499,13 +534,7 @@ namespace Isaac.Network.Spawning
                 Debug.Log("Received object success with ID: " + networkID);
                 if(m_LocalPendingBehaviours.TryGetValue(networkID, out pendingBehaviour))
                 {
-                    m_LocalPendingBehaviours.Remove(networkID);
-                    m_LocalPendingBehavioursList.Remove(pendingBehaviour.reference.networkBehaviour);
-                    networkBehaviours.Add(pendingBehaviour.reference);
-                    networkBehaviourDictionary.Add(networkID, pendingBehaviour.reference);
-                    pendingBehaviour.reference.connectedDelegate.Invoke(networkID, pendingBehaviour.reference.networkBehaviour.ownerCanUnspawn, pendingBehaviour.reference.networkBehaviour.destroyOnUnspawn);
-                    //m_ConnectedDelegates[pendingBehaviour.networkBehaviour].Invoke(networkID, pendingBehaviour.networkBehaviour.ownerCanUnspawn, pendingBehaviour.networkBehaviour.destroyOnUnspawn);
-                    //m_OnNetworkBehaviourConnected?.Invoke(pendingBehaviour.networkBehaviour, networkID);
+                    pendingBehaviour.reference.connectedClientCallback.Invoke(networkID, pendingBehaviour.reference.networkBehaviour.ownerCanUnspawn, pendingBehaviour.reference.networkBehaviour.destroyOnUnspawn);
                 }
                 else
                 {
@@ -518,7 +547,7 @@ namespace Isaac.Network.Spawning
             }
         }
 
-        public void HandleDestroyObjectMessage(ulong clientID, Stream stream, float receiveTime)
+        public void HandleUnspawnMessage(ulong clientID, Stream stream, float receiveTime)
         {
             Debug.Log("Received unspawn message");
             using(PooledBitReader reader = PooledBitReader.Get(stream))
@@ -582,21 +611,14 @@ namespace Isaac.Network.Spawning
 
         #endregion Handle Messages
 
-        /// <summary>
-        ///Called when the client successfully connects Network Behaviours. Involves switching pending Network Behaviours to active and sending the server a success message.
-        ///(Client only function)
+        ///<summary>
+        /// Called when the client successfully connects Network Behaviours. Involves switching pending Network Behaviours to active and sending the server a success message.
+        /// Client only.
         ///</summary>
-        private void OnObjectConnectSuccess(PendingNetworkBehaviour pendingBehaviour, ulong networkID)
+        private void OnObjectConnectSuccess(NetworkBehaviourReference behaviourReference, ulong networkID, bool ownerCanUnspawn, bool destroyOnUnspawn)
         {
-            if(pendingBehaviour.uniqueHash != null)
-            {
-                //Clean up pending
-                m_LocalPendingBehaviours.Remove(pendingBehaviour.uniqueHash.Value);
-                m_LocalPendingBehavioursList.Remove(pendingBehaviour.reference.networkBehaviour);
-                m_HashedStrings.Remove(pendingBehaviour.uniqueHash.Value);
-            }
-            networkBehaviours.Add(pendingBehaviour.reference);
-            networkBehaviourDictionary.Add(networkID, pendingBehaviour.reference);
+            networkBehaviours.Add(behaviourReference);
+            networkBehaviourDictionary.Add(networkID, behaviourReference);
 
             //Send confirm connection
             using(PooledBitStream stream = PooledBitStream.Get())
@@ -612,9 +634,7 @@ namespace Isaac.Network.Spawning
             }
 
             //Let our local behaviour know
-            pendingBehaviour.reference.connectedDelegate.Invoke(networkID, pendingBehaviour.ownerCanUnspawn, pendingBehaviour.destroyOnUnspawn);
-            //m_ConnectedDelegates[pendingBehaviour.networkBehaviour].Invoke(networkID, pendingBehaviour.ownerCanUnspawn, pendingBehaviour.destroyOnUnspawn);
-            //m_OnNetworkBehaviourConnected?.Invoke(pendingBehaviour.networkBehaviour, networkID);
+            behaviourReference.connectedClientCallback.Invoke(networkID, ownerCanUnspawn, destroyOnUnspawn);
         }
 
 
@@ -675,24 +695,21 @@ namespace Isaac.Network.Spawning
                     }
                 }
             }
-            new ReleasedNetworkID();
         }
 
         private struct ReleasedNetworkID
         {
             public ulong networkID;
             public float releaseTime;
-
-
-        } //Struct
+        }
 
         public struct NetworkBehaviourReference
         {
             public NetworkBehaviour networkBehaviour;
-            public NetworkBehaviourConnectedDelegate connectedDelegate;
-            public NetworkBehaviourDisconnectedDelegate disconnectedDelegate;
+            public ServerBehaviourConnectedDelegate connectedServerCallback;
+            public ClientBehaviourConnectedDelegate connectedClientCallback;
+            public BehaviourDisconnectedDelegate disconnectedDelegate;
             public NetworkBehaviourRPCDelegate localRPCDelegate;
-            public int listIndex;
         }
 
         private struct PendingNetworkBehaviour
@@ -705,6 +722,7 @@ namespace Isaac.Network.Spawning
             public bool ownerCanUnspawn;
             public bool destroyOnUnspawn;
         } //Struct
+
     } //Class
 
 } //Namespace

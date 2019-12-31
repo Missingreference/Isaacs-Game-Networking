@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using ENet;
-using MLAPI.Transports;
-using MLAPI.Transports.Tasks;
 using Isaac.Network;
 
 namespace Isaac.Network.Transports
@@ -33,8 +31,6 @@ namespace Isaac.Network.Transports
 		private Host host;
 
 		private uint serverPeerId;
-
-		private SocketTask connectTask;
 
 		public override ulong serverID => GetMLAPIClientID(0, true);
 
@@ -89,13 +85,6 @@ namespace Isaac.Network.Transports
 						@event.Peer.PingInterval(PingInterval);
 						@event.Peer.Timeout(TimeoutLimit, TimeoutMinimum, TimeoutMaximum);
 
-						if (connectTask != null)
-						{
-							connectTask.Success = true;
-							connectTask.IsDone = true;
-							connectTask = null;
-						}
-
 						return NetEventType.Connect;
 					}
 				case EventType.Disconnect:
@@ -105,13 +94,6 @@ namespace Isaac.Network.Transports
 						receiveTime = UnityEngine.Time.realtimeSinceStartup;
 
 						connectedEnetPeers.Remove(@event.Peer.ID);
-
-						if (connectTask != null)
-						{
-							connectTask.Success = false;
-							connectTask.IsDone = true;
-							connectTask = null;
-						}
 
 						return NetEventType.Disconnect;
 					}
@@ -171,11 +153,10 @@ namespace Isaac.Network.Transports
 
 		public override void StartClient()
 		{
-			SocketTask task = SocketTask.Working;
-
 			host = new Host();
 
             host.Create(1, channelCount);
+
 
 			Address targetAddress = new Address();
             targetAddress.Port = (ushort)port;
@@ -187,10 +168,6 @@ namespace Isaac.Network.Transports
 			serverPeer.Timeout(TimeoutLimit, TimeoutMinimum, TimeoutMaximum);
 
 			serverPeerId = serverPeer.ID;
-
-			connectTask = task;
-
-			//return task.AsTasks();
 		}
 
 		public override void StartServer()
