@@ -4,6 +4,8 @@ using System;
 
 using UnityEngine;
 
+using Isaac.Network.Exceptions;
+
 namespace Isaac.Network
 {
     public abstract partial class NetworkBehaviour : MonoBehaviour
@@ -15,17 +17,16 @@ namespace Isaac.Network
         {
             get
             {
-                if(m_OwnerClientID == null)
-                    return networkManager != null ? networkManager.serverID : 0;
-                return m_OwnerClientID.Value;
-            }
-            private set
-            {
-                m_OwnerClientID = value;
+                if(networkManager || !networkManager.isRunning)
+                    throw new NetworkException("Cannot get the owner ID of this Network Behaviour. Network Manager is not running.");
+                if(networkBehaviourManager == null)
+                    //If you get this exception, make sure that LoadModule<NetworkBehaviourManager> is called at some point on the Network Manager
+                    throw new NetworkException("Cannot get the owner ID of this Network Behaviour. The Network Behaviour Manager module is not loaded.");
+                return m_OwnerClientID;
             }
         }
 
-        private ulong? m_OwnerClientID = null;
+        private ulong m_OwnerClientID = 0;
 
         /// <summary>
         /// Gets whether the behaviour is owned by the local client. Also is true if the network manager is not running in cases where network behaviours are being used offline.

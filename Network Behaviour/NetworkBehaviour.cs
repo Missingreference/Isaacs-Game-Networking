@@ -214,42 +214,120 @@ namespace Isaac.Network
 
         /// <summary>
         /// When this is called it will begin its connection to its matching Network Behaviour across the network. Until this function is called it will act as a normal Monobehaviour.
+        /// Default owner is the server. Default visibility is all clients.
         /// </summary>
-        public void SpawnOnNetwork()
+        public void SpawnOnNetwork(Stream stream = null)
+        {
+            if(!IsValidSpawn()) return;
+
+            DoSpawnOnNetwork(networkManager.serverID, null, null);
+        }
+
+        /// <summary>
+        /// When this is called it will begin its connection to its matching Network Behaviour across the network. Until this function is called it will act as a normal Monobehaviour.
+        /// This variant of the function should only be called by the server since only the server can spawn a Network Behaviour with ownership.
+        /// </summary>
+        /// <param name="ownerID">The client ID of the </param>
+        public void SpawnOnNetwork(ulong ownerID, Stream stream = null)
+        {
+            if(!IsValidSpawn()) return;
+
+            DoSpawnOnNetwork(ownerID, null, null);
+        }
+
+        /// <summary>
+        /// When this is called it will begin its connection to its matching Network Behaviour across the network. Until this function is called it will act as a normal Monobehaviour.
+        /// This variant of the function should only be called by the server since only the server can spawn a Network Behaviour with ownership and alter visibility.
+        /// </summary>
+        /// <param name="ownerID">The client ID of the target client that will be the owner of this Network Behaviour.</param>
+        /// <param name="observers">The list of clients that will have visibility of this Network Behaviour.</param>
+        public void SpawnOnNetwork(ulong ownerID, List<ulong>.Enumerator observers, Stream stream = null)
+        {
+            if(!IsValidSpawn()) return;
+
+            DoSpawnOnNetwork(ownerID, observers, null);
+        }
+
+        private bool IsValidSpawn()
         {
             if(networkManager == null || !networkManager.isRunning)
             {
                 Debug.LogError("Unable to spawn. The Network Manager is not running.");
-                return;
+                return false;
             }
 
             if(networkBehaviourManager == null)
             {
                 //If this occurs make sure that LoadModule<NetworkBehaviourManager>() is called before the initialization of the Network Manager.
                 Debug.LogError("Unable to spawn. The Network Manager does not have the Network Behaviour Manager module loaded.");
-                return;
+                return false;
             }
 
             if(m_IsNetworkSpawned)
             {
                 Debug.LogError("This Network Behaviour is already spawned on the network.", this);
-                return;
+                return false;
             }
 
+            if(this == null)
+            {
+                Debug.LogError("Unable to spawn. This Network Behaviour has been destroyed.", this);
+                return false;
+            }
+
+            return true;
+        }
+
+        private void DoSpawnOnNetwork(ulong ownerID, List<ulong>.Enumerator? observers, Stream stream)
+        {
 #if UNITY_EDITOR
             m_KnownUniqueID = m_UniqueID;
 #endif
 
-            if(isServer)
+            if(stream != null)
+                Debug.LogWarning("Stream parameter is not yet implemented.");
+
+            if(isServer) //Server
             {
-                m_NetworkBehaviourManager.SpawnOnNetworkServer(this, OnBehaviourConnected, OnBehaviourDisconnected, OnServerRPCReceived);
+                if(observers == null)
+                {
+                    observers = networkManager.connectedClients.GetEnumerator();
+                }
+
+                try
+                {
+                    m_IsNetworkSpawned = true;
+                    m_NetworkBehaviourManager.SpawnOnNetworkServer(this, OnBehaviourConnected, OnBehaviourDisconnected, OnServerRPCReceived, ownerID, observers.Value);
+                }
+                catch(Exception ex)
+                {
+                    m_IsNetworkSpawned = false;
+                    throw ex;
+                }
             }
-            else
+            else //Client
             {
-                m_NetworkBehaviourManager.SpawnOnNetworkClient(this, OnBehaviourConnected, OnBehaviourDisconnected, OnClientRPCReceived);
+                if(ownerID != networkManager.serverID)
+                {
+                    throw new NotServerException("Only the server can set the owner of this Network Behaviour when spawning on the network.");
+                }
+
+                if(observers != null)
+                {
+                    throw new NotServerException("Only the server can change the visibility of this Network Behaviour when spawning on the network.");
+                }
+
+                try
+                {
+                    m_IsNetworkSpawned = true;
+                    m_NetworkBehaviourManager.SpawnOnNetworkClient(this, OnBehaviourConnected, OnBehaviourDisconnected, OnClientRPCReceived);
+                }
+                catch(Exception ex)
+                {
+                    m_IsNetworkSpawned = false;
+                    throw ex;
+                }
             }
-            
-            m_IsNetworkSpawned = true;
         }
 
         /// <summary>
@@ -257,7 +335,6 @@ namespace Isaac.Network
         /// </summary>
         public void UnspawnOnNetwork()
         {
-            Debug.Log("UnspawnOnNetwork on Behaviour called");
             if(!m_IsNetworkSpawned) //This should only be enabled if the Network Manager is running so no point in checking for a valid Network Manager.
             {
                 Debug.LogError("Cannot unspawn this Network Behaviour. It is not spawned on the network.", this);
@@ -265,8 +342,7 @@ namespace Isaac.Network
             }
             if(!isOwner && !networkManager.isServer && networkManager.isClient)
             {
-                Debug.LogError("Only the owner of this Network Behaviour or server can unspawn this Network Behaviour.", this);
-                return;
+                throw new NotServerException("Only the owner of this Network Behaviour or the server can unspawn this Network Behaviour.");
             }
 
             if(networkManager.isRunning)
@@ -328,6 +404,11 @@ namespace Isaac.Network
 
             //Call Network start function
             OnNetworkReady(networkManager.serverID);
+        }
+
+        private void OnBehaviourUpdate(bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting, ulong ownerID, bool isLostObserver, ulong observer)
+        {
+
         }
 
 

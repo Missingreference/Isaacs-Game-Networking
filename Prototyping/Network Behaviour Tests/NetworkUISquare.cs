@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 using Isaac.Network;
+using MLAPI.Messaging;
 
 public class NetworkUISquare : NetworkBehaviour
 {
@@ -33,5 +34,11 @@ public class NetworkUISquare : NetworkBehaviour
     void Update()
     {
         
+    }
+
+    [ServerRPC(RequireOwnership=true)]
+    private void SetRotation()
+    {
+
     }
 }

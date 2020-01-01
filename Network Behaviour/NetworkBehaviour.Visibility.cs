@@ -13,7 +13,6 @@ namespace Isaac.Network
 {
     public abstract partial class NetworkBehaviour : MonoBehaviour
     {
-
         private readonly HashSet<ulong> m_Observers = new HashSet<ulong>();
         private readonly HashSet<ulong> m_PendingObservers = new HashSet<ulong>();
 

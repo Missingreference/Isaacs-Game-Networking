@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System;
 
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -12,7 +13,6 @@ using MLAPI.Messaging;
 
 using Isaac.Network.Messaging;
 using Isaac.Network.Exceptions;
-using System;
 
 namespace Isaac.Network.Spawning
 {
@@ -114,35 +114,13 @@ namespace Isaac.Network.Spawning
         }
 
         //Server only
-        public void SpawnOnNetworkServer(NetworkBehaviour behaviour, ServerBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectCallback, NetworkBehaviourRPCDelegate localRPCCallback)
+        public void SpawnOnNetworkServer(NetworkBehaviour behaviour, ServerBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectCallback, NetworkBehaviourRPCDelegate localRPCCallback, ulong owner, List<ulong>.Enumerator? observers)
         {
-            if(!networkManager.isServer)
+            if(behaviour == null || !behaviour.isNetworkSpawned || behaviour.isNetworkReady || m_LocalPendingBehavioursList.Contains(behaviour))
             {
-                throw new NotServerException("Only the server can call this function.");
+                throw new InvalidOperationException("NetworkBehaviourManager.SpawnOnNetworkServer is only allowed to be called internally by a Network Behaviour.");
             }
 
-            if(behaviour == null)
-            {
-                throw new ArgumentNullException(nameof(behaviour));
-            }
-
-            //Check if the target behaviour has been destroyed
-            CheckForDestroy(behaviour);
-
-            if(behaviour.isNetworkReady)
-            {
-                throw new ArgumentException("Network Behaviour is already spawned and connected on the network.", nameof(behaviour));
-            }
-
-            if(behaviour.isNetworkSpawned)
-            {
-                throw new ArgumentException("Network Behaviour is already spawned.", nameof(behaviour));
-            }
-
-            if(m_LocalPendingBehavioursList.Contains(behaviour))
-            {
-                throw new ArgumentException("Network Behaviour is already spawned on the network.", nameof(behaviour));
-            }
             ulong newNetworkID = GetNewNetworkID();
             ulong? uniqueHash = string.IsNullOrWhiteSpace(behaviour.uniqueID) ? null : behaviour.uniqueID?.GetStableHash(networkManager.config.rpcHashSize);
 
@@ -195,35 +173,12 @@ namespace Isaac.Network.Spawning
         //Client only
         public void SpawnOnNetworkClient(NetworkBehaviour behaviour, ClientBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectedCallback, NetworkBehaviourRPCDelegate localRPCCallback)
         {
-            if(networkManager.isServer)
+            if(behaviour == null || !behaviour.isNetworkSpawned || behaviour.isNetworkReady || m_LocalPendingBehavioursList.Contains(behaviour))
             {
-                throw new NotClientException("Only a non-server client can call this function.");
+                throw new InvalidOperationException("NetworkBehaviourManager.SpawnNetworkClient is only allowed to be called internally by a Network Behaviour.");
             }
 
-            if(behaviour == null)
-            {
-                throw new ArgumentNullException(nameof(behaviour));
-            }
-
-            //Check if the target behaviour has been destroyed
-            CheckForDestroy(behaviour);
-
-            if(behaviour.isNetworkReady)
-            {
-                throw new ArgumentException("Network Behaviour is already spawned and connected on the network.", nameof(behaviour));
-            }
-
-            if(behaviour.isNetworkSpawned)
-            {
-                throw new ArgumentException("Network Behaviour is already spawned.", nameof(behaviour));
-            }
-
-            if(m_LocalPendingBehavioursList.Contains(behaviour))
-            {
-                throw new ArgumentException("Network Behaviour is already spawned on the network.", nameof(behaviour));
-            }
-
-            //Check if this is the Unique Behaviour being spawned in HandleAddObjectMessage where the Unique ID is blank and SpawnOnNetwork is called in Awake.;'
+            //Check if this is the Unique Behaviour being spawned in HandleAddObjectMessage where the Unique ID is blank and SpawnOnNetwork is called in Awake.
             if(m_TrackAwakeSpawns)
             {
                 m_BehavioursAwaitingSpawn.Enqueue(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback });
@@ -239,7 +194,7 @@ namespace Isaac.Network.Spawning
             }
 
             ulong uniqueHash = behaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize);
-            Debug.Log("Created Hash: " + uniqueHash);
+
             if(m_RemotePendingBehaviours.TryGetValue(uniqueHash, out PendingNetworkBehaviour pendingBehaviour))
             {
                 m_RemotePendingBehaviours.Remove(uniqueHash);
@@ -274,14 +229,9 @@ namespace Isaac.Network.Spawning
 
         public void UnspawnOnNetwork(NetworkBehaviour behaviour)
         {
-            if(behaviour == null && ReferenceEquals(behaviour, null))
+            if(behaviour == null || !behaviour.isNetworkSpawned)
             {
-                throw new ArgumentNullException(nameof(behaviour));
-            }
-
-            if(!behaviour.isNetworkSpawned)
-            {
-                throw new ArgumentException("Unable to unspawn. Target behaviour is not spawned.", nameof(behaviour));
+                throw new InvalidOperationException("NetworkBehaviourManager.UnspawnOnNetwork is only allowed to be called internally by a Network Behaviour.");
             }
 
             if(networkManager.isServer)
@@ -311,25 +261,15 @@ namespace Isaac.Network.Spawning
             }
             else //Client
             {
-                if(behaviour.isOwner)
+                if(!behaviour.isOwner || behaviour.ownerCanUnspawn)
                 {
-                    if(behaviour.ownerCanUnspawn)
-                    {
-                        if(behaviour.isNetworkReady)
-                            DoLocalUnspawn(networkBehaviourDictionary[behaviour.networkID], behaviour.destroyOnUnspawn);
-                        else
-                            DoLocalUnspawn(m_LocalPendingBehaviours.FirstOrDefault(b=>b.Value.reference.networkBehaviour == behaviour).Value,behaviour.destroyOnUnspawn);
-                    }
-                    else
-                    {
-                        throw new NotServerException("Network Behaviour is not allowed to be unspawned by the owner with ownerCanUnspawn set to false as a client.");
-                    }
+                    throw new InvalidOperationException("NetworkBehaviourManager.UnspawnOnNetwork is only allowed to be called internally by a Network Behaviour.");
                 }
+
+                if(behaviour.isNetworkReady)
+                    DoLocalUnspawn(networkBehaviourDictionary[behaviour.networkID], behaviour.destroyOnUnspawn);
                 else
-                {
-                    Debug.LogError("Target Network Behaviour is not allowed to be unspawned by the client.");
-                    return;
-                }
+                    DoLocalUnspawn(m_LocalPendingBehaviours.FirstOrDefault(b => b.Value.reference.networkBehaviour == behaviour).Value, behaviour.destroyOnUnspawn);
             }
         }
 
