@@ -16,6 +16,8 @@ namespace MLAPI.Messaging
         private static readonly Dictionary<Type, RPCTypeDefinition> typeLookup = new Dictionary<Type, RPCTypeDefinition>();
         private static readonly Dictionary<ulong, string> hashResults = new Dictionary<ulong, string>();
         private static readonly Dictionary<ulong, Type> typeHashes = new Dictionary<ulong, Type>();
+        private static readonly Dictionary<Type, ulong> hashByType = new Dictionary<Type, ulong>();
+
 
         public static RPCTypeDefinition Get(Type type)
         {
@@ -31,21 +33,12 @@ namespace MLAPI.Messaging
         public static Type GetTypeFromHash(ulong hash)
         {
             if(typeHashes.Count == 0)
-            {
-                //Get all hashes of NetworkBehaviour
-                List<Type> networkBehaviourTypes = AppDomain.CurrentDomain.GetAssemblies()
-                       .SelectMany(assembly => assembly.GetTypes())
-                       .Where(type => type.IsSubclassOf(typeof(NetworkBehaviour))).ToList();
-                for(int i = 0; i < networkBehaviourTypes.Count; i++)
-                {
-                    Debug.Log("Found NetworkBehaviour type: " + networkBehaviourTypes[i].ToString());
-                    typeHashes.Add(networkBehaviourTypes[i].ToString().GetStableHash(NetworkManager.Get().config.rpcHashSize), networkBehaviourTypes[i]);
-                }
-            }
+                HashAllNetworkBehaviours();
+
             Type foundType;
             if(!typeHashes.TryGetValue(hash, out foundType))
             {
-                Debug.LogError("No type found associated with hash.");
+                Debug.LogError("No type found associated with hash '" + hash  + "'.");
                 return null;
             }
             return foundType;
@@ -54,17 +47,42 @@ namespace MLAPI.Messaging
         public static ulong GetHashFromType(Type type)
         {
             if(typeHashes.Count == 0)
+                HashAllNetworkBehaviours();
+
+            if(!type.IsSubclassOf(typeof(NetworkBehaviour)))
             {
-                //Get all hashes of NetworkBehaviour
-                List<Type> networkBehaviourTypes = AppDomain.CurrentDomain.GetAssemblies()
-                       .SelectMany(assembly => assembly.GetTypes())
-                       .Where(nextType => nextType.IsSubclassOf(typeof(NetworkBehaviour))).ToList();
-                for(int i = 0; i < networkBehaviourTypes.Count; i++)
+                Debug.LogError("Type '" + type + "' does not derive from NetworkBehaviour and will not have a hash associated with it.");
+                return 0;
+            }
+
+            if(!hashByType.TryGetValue(type, out ulong hash))
+            {
+                Debug.LogError("Type '" + type + "' does not have a hash associated with it.");
+                return 0;
+            }
+
+            return hash;
+        }
+
+        private static void HashAllNetworkBehaviours()
+        {
+            //Get all hashes of NetworkBehaviour
+            List<Type> networkBehaviourTypes = AppDomain.CurrentDomain.GetAssemblies()
+                   .SelectMany(assembly => assembly.GetTypes())
+                   .Where(type => type.IsSubclassOf(typeof(NetworkBehaviour))).ToList();
+            string debugString = "Network Behaviour Types(" + networkBehaviourTypes.Count + "):\n";
+            for(int i = 0; i < networkBehaviourTypes.Count; i++)
+            {
+                ulong hash = networkBehaviourTypes[i].ToString().GetStableHash(NetworkManager.Get().config.rpcHashSize);
+                typeHashes.Add(hash, networkBehaviourTypes[i]);;
+                hashByType.Add(networkBehaviourTypes[i], hash);
+                if(NetworkManager.Get().enableLogging)
                 {
-                    typeHashes.Add(networkBehaviourTypes[i].ToString().GetStableHash(NetworkManager.Get().config.rpcHashSize), networkBehaviourTypes[i]);
+                    debugString += networkBehaviourTypes[i] + " hashed to '" + hash + "'.\n";
                 }
             }
-            return typeHashes.FirstOrDefault(x => x.Value == type).Key;
+            if(NetworkManager.Get().enableLogging)
+                Debug.Log(debugString);
         }
 
         private static ulong HashMethodNameAndValidate(string name)

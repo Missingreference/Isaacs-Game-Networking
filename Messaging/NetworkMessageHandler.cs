@@ -53,7 +53,7 @@ namespace Isaac.Network.Messaging
 
         public NetworkMessageHandler()
         {
-            //RegisterBuiltInMessages();
+
         }
 
         public override void Init(NetworkModule[] loadedDependencies)
@@ -62,8 +62,7 @@ namespace Isaac.Network.Messaging
         }
 
         /// <summary>
-        /// Add a custom message to be handled. Also registered messages CANNOT be unregistered. Maximum of 256(size of byte) messages can be registered (including 0(INVALID) and all built-in messages).
-        /// If you want more than that use MLAPI's CustomMessageManager. It uses HashSets instead of an array so its slower by very little and supports very slow but convenient unnamed messages. TODO: Update CustomMessageManager to latest version to support unregistering custom messages.
+        /// Add a custom message to be handled. Also registered messages CANNOT be unregistered. Maximum of 256(size of byte) messages can be registered (including 255(INVALID) and all built-in messages).
         /// Messages should be registered in the same order on the server and each client otherwise there will be game breaking issues occuring.
         /// </summary>
         /// <param name="messageName">The name of the message type.</param>
@@ -159,132 +158,13 @@ namespace Isaac.Network.Messaging
 #endif
                     break;
             }
-            /*
-            //Server only
-            if(m_NetworkManager.isServer)
-            {
-                switch(messageType)
-                {
-                    case NetworkMessageType.NETWORK_CONNECTION_REQUEST:
-                        HandleConnectionRequest(sendingClientID, messageStream);
-                        return;
-                    case NetworkMessageType.NETWORK_SERVER_RPC:
-                        HandleServerRPC(sendingClientID, messageStream);
-                        return;
-                    case NetworkMessageType.NETWORK_SERVER_RPC_REQUEST:
-                        HandleServerRPCRequest(sendingClientID, messageStream, channelName, security);
-                        return;
-                    case NetworkMessageType.NETWORK_CLIENT_RPC_RESPONSE:
-                        HandleClientRPCResponse(sendingClientID, messageStream);
-                        return;
-                    case NetworkMessageType.NETWORK_CLIENT_SCENE_CHANGE_COMPLETE:
-                        HandleClientSceneChange(sendingClientID, messageStream);
-                        return;
-                }
-            }
-            //Client only
-            if(m_NetworkManager.isClient)
-            {
-                switch(messageType)
-                {
-                    case NetworkMessageType.NETWORK_CONNECTION_APPROVED:
-                        HandleConnectionApproved(sendingClientID, messageStream, receiveTime);
-                        return;
-                    case NetworkMessageType.NETWORK_ADD_OBJECT:
-                        HandleAddObject(sendingClientID, messageStream);
-                        return;
-                    case NetworkMessageType.NETWORK_DESTROY_OBJECT:
-                        HandleDestroyObject(sendingClientID, messageStream);
-                        return;
-                    case NetworkMessageType.NETWORK_SCENE_CHANGE:
-
-                        return;
-                    case NetworkMessageType.NETWORK_CHANGE_OWNER:
-                        HandleChangeOwner(sendingClientID, messageStream);
-                        return;
-                    case NetworkMessageType.NETWORK_ADD_OBJECTS:
-                        HandleAddObjects(sendingClientID, messageStream);
-                        return;
-                    case NetworkMessageType.NETWORK_DESTROY_OBJECTS:
-                        HandleDestroyObjects(sendingClientID, messageStream);
-                        return;
-                    case NetworkMessageType.NETWORK_TIME_SYNC:
-                        HandleTimeSync(sendingClientID, messageStream, receiveTime);
-                        return;
-                    case NetworkMessageType.NETWORK_SERVER_RPC_RESPONSE:
-                        HandleServerRPCResponse(sendingClientID, messageStream);
-                        return;
-                    case NetworkMessageType.NETWORK_CLIENT_RPC:
-                        HandleClientRPC(sendingClientID, messageStream);
-                        return;
-                    case NetworkMessageType.NETWORK_CLIENT_RPC_REQUEST:
-                        HandleClientRPCRequest(sendingClientID, messageStream, channelName, security);
-                        return;
-                }
-            }
-            //Applies to both server and client
-            switch(messageType)
-            {
-                case NetworkMessageType.NETWORK_NETWORKED_VAR_DELTA:
-                    HandleNetworkedVarDelta(sendingClientID, messageStream);
-                    return;
-                case NetworkMessageType.NETWORK_NETWORKED_VAR_UPDATE:
-                    HandleNetworkedVarUpdate(sendingClientID, messageStream);
-                    return;
-                case NetworkMessageType.NETWORK_UNNAMED_MESSAGE:
-                    HandleUnnamedMessage(sendingClientID, messageStream);
-                    return;
-                case NetworkMessageType.NETWORK_NAMED_MESSAGE:
-                    HandleNamedMessage(sendingClientID, messageStream);
-                    return;
-                default:
-                    Debug.LogError("Read unrecognized messageType " + messageType);
-                    return;
-            }
-            */
         }
-
+            
         /*
-        private void HandleAddObject(ulong clientID, Stream stream)
-        {
-            //Read from server function NetworkBehaviourManager.SpawnOnNetwork()
-            using(PooledBitReader reader = PooledBitReader.Get(stream))
-            {
-                ulong networkID = reader.ReadUInt64Packed();
-                ulong ownerID = reader.ReadUInt64Packed();
-                Type behaviourType = (Type)reader.ReadObjectPacked(typeof(Type));
-
-                Vector3? pos = null;
-                Quaternion? rot = null;
-                Vector3? scale = null;
-                if(reader.ReadBool())
-                {
-                    pos = new Vector3(reader.ReadSinglePacked(), reader.ReadSinglePacked(), reader.ReadSinglePacked());
-                    rot = Quaternion.Euler(reader.ReadSinglePacked(), reader.ReadSinglePacked(), reader.ReadSinglePacked());
-                    scale = new Vector3(reader.ReadSinglePacked(), reader.ReadSinglePacked(), reader.ReadSinglePacked());
-                }
-
-
-                NetworkBehaviour newBehaviour = m_BehaviourManager.CreateLocalNetworkObject();
-                m_BehaviourManager.SetupLocalNetworkBehaviour(newBehaviour, networkID, ownerID, stream, false, 0, false);
-                //NetworkBehaviour netObject = SpawnManager.CreateLocalNetworkedObject(softSync, instanceId, prefabHash, parentNetworkId, pos, rot);
-                //SpawnManager.SpawnNetworkedObjectLocally(netObject, networkId, softSync, isPlayerObject, ownerId, stream, hasPayload, payLoadLength, true, false);
-            }
-        }
-
-        private void HandleDestroyObject(ulong clientID, Stream stream)
-        {
-            using(PooledBitReader reader = PooledBitReader.Get(stream))
-            {
-                ulong networkId = reader.ReadUInt64Packed();
-                SpawnManager.OnDestroyObject(networkId, true);
-            }
-        }
-
         private void HandleChangeOwner(ulong clientID, Stream stream)
         {
-            Debug.LogWarning("Using unimplemented function.");*/
-        /*
+            Debug.LogWarning("Using unimplemented function.");
+        
         using (PooledBitReader reader = PooledBitReader.Get(stream))
         {
             ulong networkId = reader.ReadUInt64Packed();
@@ -302,39 +182,13 @@ namespace Isaac.Network.Messaging
             }
             SpawnManager.SpawnedObjects[networkId].ownerClientID = ownerClientId;
 
-        }*//*
-    }
-
-    private void HandleAddObjects(ulong clientID, Stream stream)
-    {
-        using(PooledBitReader reader = PooledBitReader.Get(stream))
-        {
-            ushort objectCount = reader.ReadUInt16Packed();
-
-            for(int i = 0; i < objectCount; i++)
-            {
-                HandleAddObject(clientID, stream);
-            }
-        }
-    }
-
-    private void HandleDestroyObjects(ulong clientID, Stream stream)
-    {
-        using(PooledBitReader reader = PooledBitReader.Get(stream))
-        {
-            ushort objectCount = reader.ReadUInt16Packed();
-
-            for(int i = 0; i < objectCount; i++)
-            {
-                HandleDestroyObject(clientID, stream);
-            }
         }
     }
 
     private void HandleNetworkedVarDelta(ulong clientID, Stream stream)
     {
-        Debug.LogWarning("Using unimplemented function.");*/
-           /*
+        Debug.LogWarning("Using unimplemented function.");
+
            if (!NetworkManager.Get().config.EnableNetworkedVar)
            {
                Debug.LogWarning("NetworkedVar delta received but EnableNetworkedVar is false");
@@ -362,13 +216,12 @@ namespace Isaac.Network.Messaging
                    return;
                }
            }
-           *//*
        }
 
        private void HandleNetworkedVarUpdate(ulong clientID, Stream stream)
        {
 
-           Debug.LogWarning("Using unimplemented function.");*//*
+           Debug.LogWarning("Using unimplemented function.");
            if (!NetworkManager.Get().config.EnableNetworkedVar)
            {
                Debug.LogWarning("NetworkedVar update received but EnableNetworkedVar is false");
@@ -395,13 +248,11 @@ namespace Isaac.Network.Messaging
                    Debug.LogWarning("NetworkedVar message recieved for a non existant object with id: " + networkId);
                    return;
                }
-           }*//*
        }
 
        private void HandleServerRPC(ulong clientID, Stream stream)
        {
-           Debug.LogWarning("Use of unimplemented function.");*/
-              /*
+           Debug.LogWarning("Use of unimplemented function.");
               using (PooledBitReader reader = PooledBitReader.Get(stream))
               {
                   ulong networkId = reader.ReadUInt64Packed();
@@ -416,13 +267,12 @@ namespace Isaac.Network.Messaging
                           behaviour.OnRemoteServerRPC(hash, clientId, stream);
                       }
                   }
-              }*//*
+              }
           }
 
           private void HandleServerRPCRequest(ulong clientID, Stream stream, string channelName, SecuritySendFlags security)
           {
-              Debug.LogWarning("Use of unimplemented function.");*/
-                 /*
+              Debug.LogWarning("Use of unimplemented function.");
                  using (PooledBitReader reader = PooledBitReader.Get(stream))
                  {
                      ulong networkId = reader.ReadUInt64Packed();
@@ -449,7 +299,7 @@ namespace Isaac.Network.Messaging
                              }
                          }
                      }
-                 }*//*
+                 }
              }
 
              private void HandleServerRPCResponse(ulong clientID, Stream stream)
@@ -469,14 +319,11 @@ namespace Isaac.Network.Messaging
                          responseBase.IsSuccessful = true;
                      }
                  }
-             }*/
-                    /*
+             }
                     private void HandleClientRPC(ulong clientID, Stream stream)
                     {
 
                         Debug.LogWarning("Use of unimplemented function.");
-                        */
-                    /*
                     using (PooledBitReader reader = PooledBitReader.Get(stream))
                     {
                         ulong networkId = reader.ReadUInt64Packed();
@@ -492,15 +339,12 @@ namespace Isaac.Network.Messaging
                             }
                         }
                     }
-                    */
-                    /*
                 }
 
                 private void HandleClientRPCRequest(ulong clientID, Stream stream, string channelName, SecuritySendFlags security)
                 {
 
-                    Debug.LogWarning("Use of unimplemented function.");*/
-                    /*
+                    Debug.LogWarning("Use of unimplemented function.");
                     using (PooledBitReader reader = PooledBitReader.Get(stream))
                     {
                         ulong networkId = reader.ReadUInt64Packed();
@@ -527,7 +371,7 @@ namespace Isaac.Network.Messaging
                                 }
                             }
                         }
-                    }*/ /*
+                    }
         }
        
         private void HandleClientRPCResponse(ulong clientID, Stream stream)
@@ -550,21 +394,5 @@ namespace Isaac.Network.Messaging
                 }
             }
         }*/
-
-        private void HandleUnnamedMessage(ulong clientID, Stream stream)
-        {
-            CustomMessagingManager.InvokeUnnamedMessage(clientID, stream);
-        }
-
-        private void HandleNamedMessage(ulong clientID, Stream stream)
-        {
-            using(PooledBitReader reader = PooledBitReader.Get(stream))
-            {
-                ulong hash = reader.ReadUInt64Packed();
-
-                CustomMessagingManager.InvokeNamedMessage(hash, clientID, stream);
-            }
-        }
-
     } //Class
 } //Namespace

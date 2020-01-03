@@ -52,6 +52,7 @@ public class NetworkManagerWindow : MonoBehaviour
         if(networkManager == null)
         {
             networkManager = new GameObject("Network Manager").AddComponent<NetworkManager>();
+            networkManager.enableLogging = true;
         }
 
         Hide();
@@ -102,7 +103,7 @@ public class NetworkManagerWindow : MonoBehaviour
             statusText.text = "Running";
             if(networkManager.isHost)
             {
-                clientsText.text = "[Host] ID: " + networkManager.clientID + " Connected Clients: " + networkManager.connectedClients.Count;
+                clientsText.text = "[Host] ID: " + networkManager.clientID + " Connected Clients: " + networkManager.connectedClientCount;
                 statusText.text += " [Listening]";
             }
             else if(networkManager.isClient)
@@ -174,14 +175,18 @@ public class NetworkManagerWindow : MonoBehaviour
             Debug.Log("Server Started");
 
         networkLogModule = networkManager.GetModule<NetworkLogModule>();
-        //networkLogModule.onReceivedNetworkLog += OnNetworkLog;
+        if(networkLogModule != null)
+            networkLogModule.onReceivedNetworkLog += OnNetworkLog;
         bottomRightText.text = "";
     }
 
     void OnNetworkShutdown()
     {
-        networkLogModule.onReceivedNetworkLog -= OnNetworkLog;
-        networkLogModule = null;
+        if(networkLogModule != null)
+        {
+            networkLogModule.onReceivedNetworkLog -= OnNetworkLog;
+            networkLogModule = null;
+        }
     }
 
     void OnNetworkLog(ulong clientID, string condition, string stackTrace, LogType logType)
@@ -225,10 +230,13 @@ public class NetworkManagerWindow : MonoBehaviour
 
     void OnClientConnect(ulong clientID)
     {
-        if(networkManager.isServer)
-            networkLogModule.ToggleRemoteTarget(clientID, true, false);
-        else
-            networkLogModule.ToggleRemoteTarget(networkManager.serverID, true, false);
+        if(networkLogModule != null)
+        {
+            if(networkManager.isServer)
+                networkLogModule.ToggleRemoteTarget(clientID, true, false);
+            else
+                networkLogModule.ToggleRemoteTarget(networkManager.serverID, true, false);
+        }
     }
 
     private void OnVisibleToggleButtonPressed()

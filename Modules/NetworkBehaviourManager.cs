@@ -31,7 +31,7 @@ namespace Isaac.Network.Spawning
 
         public override Type[] dependencies => new Type[] { typeof(NetworkMessageHandler) };
 
-        public delegate void ServerBehaviourConnectedDelegate(ulong networkID, ulong clientID);
+        public delegate void ServerBehaviourConnectedDelegate(ulong networkID, ulong clientID, List<ulong> observers);
         public delegate void ClientBehaviourConnectedDelegate(ulong networkID, bool ownerCanUnspawn, bool destroyOnUnspawn);
         public delegate void BehaviourDisconnectedDelegate(bool ownerCanUnspawn, bool destroyOnUnspawn);
         public delegate void NetworkBehaviourRPCDelegate(ulong hash, ulong senderClientID, Stream stream);
@@ -114,7 +114,7 @@ namespace Isaac.Network.Spawning
         }
 
         //Server only
-        public void SpawnOnNetworkServer(NetworkBehaviour behaviour, ServerBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectCallback, NetworkBehaviourRPCDelegate localRPCCallback, ulong owner, List<ulong>.Enumerator? observers)
+        public void SpawnOnNetworkServer(NetworkBehaviour behaviour, ServerBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectCallback, NetworkBehaviourRPCDelegate localRPCCallback, ulong owner, List<ulong> observers)
         {
             if(behaviour == null || !behaviour.isNetworkSpawned || behaviour.isNetworkReady || m_LocalPendingBehavioursList.Contains(behaviour))
             {
@@ -148,26 +148,8 @@ namespace Isaac.Network.Spawning
 
             networkBehaviours.Add(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedServerCallback = connectedCallback, disconnectedDelegate = disconnectCallback, localRPCDelegate = localRPCCallback });
             networkBehaviourDictionary.Add(newNetworkID, networkBehaviours[networkBehaviours.Count - 1]);
-
-            //Since were the server, send to all clients the spawning Network Behaviour
-            using(PooledBitStream stream = PooledBitStream.Get())
-            {
-                using(PooledBitWriter writer = PooledBitWriter.Get(stream))
-                {
-                    //Write behaviour info and type
-                    writer.WriteUInt64Packed(newNetworkID);
-                    writer.WriteUInt64Packed(behaviour.ownerClientID);
-                    writer.WriteUInt64Packed(RPCTypeDefinition.GetHashFromType(behaviour.GetType()));
-                    writer.WriteBool(uniqueHash != null);
-                    if(uniqueHash != null)
-                        writer.WriteUInt64Packed(uniqueHash.Value);
-                    Debug.Log("Sending to clients the new behaviour " + behaviour.GetType());
-                }
-
-                MessageSender.SendToAll(spawnMessageType, networkManager.networkInternalChannel, stream);
-            }
-
-            networkBehaviours[networkBehaviours.Count - 1].connectedServerCallback.Invoke(newNetworkID, networkManager.serverID);
+            
+            networkBehaviours[networkBehaviours.Count - 1].connectedServerCallback.Invoke(newNetworkID, networkManager.serverID, observers);
         }
 
         //Client only
@@ -337,7 +319,7 @@ namespace Isaac.Network.Spawning
                             //Write behaviour info and type
                             writer.WriteUInt64Packed(networkBehaviours[i].networkBehaviour.networkID);
                             writer.WriteUInt64Packed(networkBehaviours[i].networkBehaviour.ownerClientID);
-                            writer.WriteUInt64Packed(RPCTypeDefinition.GetHashFromType(networkBehaviours[i].GetType()));
+                            writer.WriteUInt64Packed(RPCTypeDefinition.GetHashFromType(networkBehaviours[i].networkBehaviour.GetType()));
                             writer.WriteBool(networkBehaviours[i].networkBehaviour.ownerCanUnspawn);
                             writer.WriteBool(networkBehaviours[i].networkBehaviour.destroyOnUnspawn);
                             if(string.IsNullOrWhiteSpace(networkBehaviours[i].networkBehaviour.uniqueID))
@@ -349,39 +331,7 @@ namespace Isaac.Network.Spawning
                                 writer.WriteBool(true);
                                 writer.WriteUInt64Packed(networkBehaviours[i].networkBehaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize));
                             }
-                            Debug.Log("Sending to new client the existing behaviour '" + networkBehaviours[i].GetType() + "'.");
-                        }
-
-                        MessageSender.SendToAll(spawnMessageType, networkManager.networkInternalChannel, stream);
-                    }
-                }
-
-                List<PendingNetworkBehaviour> values = m_LocalPendingBehaviours.Values.ToList();
-
-                //Send any pending
-                for(int i = 0; i < values.Count; i++)
-                {
-                    //Since were the server, send to all clients the spawning Network Behaviour
-                    using(PooledBitStream stream = PooledBitStream.Get())
-                    {
-                        using(PooledBitWriter writer = PooledBitWriter.Get(stream))
-                        {
-                            //Write behaviour info and type
-                            writer.WriteUInt64Packed(values[i].networkID);
-                            writer.WriteUInt64Packed(networkManager.serverID);
-                            writer.WriteUInt64Packed(RPCTypeDefinition.GetHashFromType(values[i].reference.networkBehaviour.GetType()));
-                            writer.WriteBool(values[i].ownerCanUnspawn);
-                            writer.WriteBool(values[i].destroyOnUnspawn);
-                            if(string.IsNullOrWhiteSpace(values[i].reference.networkBehaviour.uniqueID))
-                            {
-                                writer.WriteBool(false);
-                            }
-                            else
-                            {
-                                writer.WriteBool(true);
-                                writer.WriteUInt64Packed(values[i].reference.networkBehaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize));
-                            }
-                            Debug.Log("Sending to new client the existing behaviour '" + values[i].reference.networkBehaviour.GetType() + "'.");
+                            Debug.Log("Sending to new client the existing behaviour '" + networkBehaviours[i].networkBehaviour.GetType() + "'.");
                         }
 
                         MessageSender.SendToAll(spawnMessageType, networkManager.networkInternalChannel, stream);
@@ -469,20 +419,15 @@ namespace Isaac.Network.Spawning
         {
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
-                PendingNetworkBehaviour pendingBehaviour;
                 ulong networkID = reader.ReadUInt64Packed();
                 Debug.Log("Received object success with ID: " + networkID);
-                if(m_LocalPendingBehaviours.TryGetValue(networkID, out pendingBehaviour))
+                if(networkBehaviourDictionary.TryGetValue(networkID, out NetworkBehaviourReference behaviourReference))
                 {
-                    pendingBehaviour.reference.connectedClientCallback.Invoke(networkID, pendingBehaviour.reference.networkBehaviour.ownerCanUnspawn, pendingBehaviour.reference.networkBehaviour.destroyOnUnspawn);
+                    behaviourReference.connectedServerCallback.Invoke(networkID, clientID, null);
                 }
                 else
                 {
-                    //Check if network ID is being used
-                    if(!networkBehaviourDictionary.ContainsKey(networkID))
-                        Debug.LogError("Received object success message with unknown network ID '" + networkID + "'.");
-
-                    //Do nothing were already spawned and connected on the network.
+                    Debug.LogError("Received object success message with unknown network ID '" + networkID + "'.");
                 }
             }
         }

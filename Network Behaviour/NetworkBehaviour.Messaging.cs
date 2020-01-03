@@ -18,7 +18,7 @@ namespace Isaac.Network
         //TODO Configure to not be internal
         internal RPCDelegate[] rpcDelegates;
 
-        public void InvokeServerRPC(RPCDelegate method, Stream messageStream, byte channel=NetworkTransport.DEFAULT_CHANNEL)
+        public void InvokeServerRPC(RPCDelegate method, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
             if(isServer && !isClient)
             {
@@ -54,7 +54,7 @@ namespace Isaac.Network
 
         public void InvokeServerRPC(RPCDelegate method, Stream messageStream, string channel) => InvokeServerRPC(method, messageStream, NetworkManager.Get().transport.GetChannelByName(channel));
 
-        public void InvokeClientRPC(RPCDelegate method, Stream messageStream, byte channel=NetworkTransport.DEFAULT_CHANNEL)
+        public void InvokeClientRPC(RPCDelegate method, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
             if(!isServer && isClient)
             {
@@ -89,7 +89,7 @@ namespace Isaac.Network
         }
 
         public void InvokeClientRPC(RPCDelegate method, Stream messageStream, string channel) => InvokeClientRPC(method, messageStream, NetworkManager.Get().transport.GetChannelByName(channel));
-        
+
         /*
         internal RpcResponse<T> SendServerRPCPerformanceResponse<T>(ulong hash, Stream messageStream, string channel)
         {
@@ -150,7 +150,7 @@ namespace Isaac.Network
             }
         }*/
 
-        public void InvokeClientRPCAll(RPCDelegate method, Stream messageStream, byte channel=NetworkTransport.DEFAULT_CHANNEL)
+        public void InvokeClientRPCAll(RPCDelegate method, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
             if(!isServer && isClient)
             {
@@ -183,13 +183,13 @@ namespace Isaac.Network
                 }
             }
         }
-        
+
         public void InvokeClientRPCAllExcept(RPCDelegate method, ulong clientIDToIgnore, Stream messageStream)
         {
 
         }
 
-        internal void SendClientRPCPerformance(ulong hash, List<ulong> clientIds, Stream messageStream, string channel = null)
+        internal void SendClientRPCPerformance(ulong hash, List<ulong> clientIDs, Stream messageStream, string channel = null)
         {
             if(!networkManager.isServer && networkManager.isClient)
             {
@@ -203,35 +203,39 @@ namespace Isaac.Network
                 using(PooledBitWriter writer = PooledBitWriter.Get(stream))
                 {
                     writer.WriteUInt64Packed(networkID);
-                    //writer.WriteUInt16Packed(NetworkedObject.GetOrderIndex(this));
                     writer.WriteUInt64Packed(hash);
 
                     stream.CopyFrom(messageStream);
 
-                    if(clientIds == null)
+                    if(clientIDs == null) //Since this list is null it is assumed it will be sent to all clients. If no clients is wanted then the parameter should be an empty list.
                     {
-                        for(int i = 0; i < networkManager.connectedClients.Count; i++)
+                        using(List<ulong>.Enumerator clients = networkManager.clients)
                         {
-                            /*if(!this.NetworkedObject.observers.Contains(NetworkingManager.Singleton.ConnectedClientsList[i].ClientId))
+                            while(clients.MoveNext())
                             {
-                                if(LogHelper.CurrentLogLevel <= LogLevel.Developer) LogHelper.LogWarning("Silently suppressed ClientRPC because a target in the bulk list was not an observer");
-                                continue;
-                            }
-                            */
-                            if(networkManager.isHost && networkManager.connectedClients[i] == networkManager.clientID)
-                            {
-                                messageStream.Position = 0;
-                                InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
-                            }
-                            else
-                            {
-                                MessageSender.Send(networkManager.connectedClients[i], networkBehaviourManager.clientRPCMessageType, string.IsNullOrEmpty(channel) ? "NETWORK_DEFAULT" : channel, stream);
+                                if(!IsNetworkVisibleTo(clients.Current))
+                                {
+                                    if(networkManager.enableLogging)
+                                    {
+                                        Debug.LogWarning("Silently suppressed ClientRPC on target client '" + clients.Current + "' because it is not visible to the target client.");
+                                    }
+                                    continue;
+                                }
+                                if(networkManager.isHost && clients.Current == networkManager.clientID)
+                                {
+                                    messageStream.Position = 0;
+                                    InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
+                                }
+                                else
+                                {
+                                    MessageSender.Send(clients.Current, networkBehaviourManager.clientRPCMessageType, string.IsNullOrEmpty(channel) ? "NETWORK_DEFAULT" : channel, stream);
+                                }
                             }
                         }
                     }
                     else
                     {
-                        for(int i = 0; i < clientIds.Count; i++)
+                        for(int i = 0; i < clientIDs.Count; i++)
                         {
                             /*if(!this.NetworkedObject.observers.Contains(clientIds[i]))
                             {
@@ -239,14 +243,14 @@ namespace Isaac.Network
                                 continue;
                             }*/
 
-                            if(networkManager.isHost && clientIds[i] == networkManager.clientID)
+                            if(networkManager.isHost && clientIDs[i] == networkManager.clientID)
                             {
                                 messageStream.Position = 0;
                                 InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
                             }
                             else
                             {
-                                MessageSender.Send(clientIds[i], networkBehaviourManager.clientRPCMessageType, string.IsNullOrEmpty(channel) ? "NETWORK_DEFAULT" : channel, stream);
+                                MessageSender.Send(clientIDs[i], networkBehaviourManager.clientRPCMessageType, string.IsNullOrEmpty(channel) ? "NETWORK_DEFAULT" : channel, stream);
                             }
                         }
                     }
@@ -254,7 +258,7 @@ namespace Isaac.Network
             }
         }
 
-        internal void SendClientRPCPerformance(ulong hash, Stream messageStream, ulong clientIdToIgnore, string channel = null)
+        internal void SendClientRPCPerformance(ulong hash, Stream messageStream, ulong clientIDToIgnore, string channel = null)
         {
             if(!networkManager.isServer && networkManager.isClient)
             {
@@ -273,27 +277,31 @@ namespace Isaac.Network
 
                     stream.CopyFrom(messageStream);
 
-
-                    for(int i = 0; i < networkManager.connectedClients.Count; i++)
+                    using(List<ulong>.Enumerator clients = networkManager.clients)
                     {
-                        if(networkManager.connectedClients[i] == clientIdToIgnore)
-                            continue;
-
-                        /*if(!this.NetworkedObject.observers.Contains(NetworkingManager.Singleton.ConnectedClientsList[i].ClientId))
+                        while(clients.MoveNext())
                         {
-                            if(LogHelper.CurrentLogLevel <= LogLevel.Developer) LogHelper.LogWarning("Silently suppressed ClientRPC because a connected client was not an observer");
-                            continue;
-                        }*/
+                            if(clients.Current == clientIDToIgnore)
+                                continue;
 
+                            if(!IsNetworkVisibleTo(clients.Current))
+                            {
+                                if(networkManager.enableLogging)
+                                {
+                                    Debug.LogWarning("Silently suppressed ClientRPC on target client '" + clients.Current + "' because it is not visible to the target client.");
+                                }
+                                continue;
+                            }
 
-                        if(networkManager.isHost && networkManager.connectedClients[i] == networkManager.clientID)
-                        {
-                            messageStream.Position = 0;
-                            InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
-                        }
-                        else
-                        {
-                            MessageSender.Send(networkManager.connectedClients[i], networkBehaviourManager.clientRPCMessageType, string.IsNullOrEmpty(channel) ? "NETWORK_DEFAULT" : channel, stream);
+                            if(networkManager.isHost && clients.Current == networkManager.clientID)
+                            {
+                                messageStream.Position = 0;
+                                InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
+                            }
+                            else
+                            {
+                                MessageSender.Send(clients.Current, networkBehaviourManager.clientRPCMessageType, string.IsNullOrEmpty(channel) ? "NETWORK_DEFAULT" : channel, stream);
+                            }
                         }
                     }
                 }

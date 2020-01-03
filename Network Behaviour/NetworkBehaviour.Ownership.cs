@@ -17,7 +17,7 @@ namespace Isaac.Network
         {
             get
             {
-                if(networkManager || !networkManager.isRunning)
+                if(networkManager == null || !networkManager.isRunning)
                     throw new NetworkException("Cannot get the owner ID of this Network Behaviour. Network Manager is not running.");
                 if(networkBehaviourManager == null)
                     //If you get this exception, make sure that LoadModule<NetworkBehaviourManager> is called at some point on the Network Manager

@@ -92,16 +92,12 @@ namespace Isaac.Network.Messaging
                 {
                     if(NetworkManager.Get().isServer && clientIDs[i] == NetworkManager.Get().serverID)
                         continue;
-                    if(!NetworkManager.Get().connectedClients.Contains(clientIDs[i]))
-                    {
-                        Debug.LogError("Tried to message client ID '" + clientIDs[i] + "' but it is not in the Network Manager's connected clients list.");
-                        continue;
-                    }
 
                     NetworkManager.Get().transport.Send(clientIDs[i], new ArraySegment<byte>(stream.GetBuffer(), 0, (int)stream.Length), channel);
                 }
             }
         }
+
 
         static public void SendToAll(MessageType messageType, BitStream messageStream)
         {
@@ -134,12 +130,15 @@ namespace Isaac.Network.Messaging
 
             using(BitStream stream = MessagePacker.WrapMessage(messageType, 0, messageStream, SecuritySendFlags.None))
             {
-                for(int i = 0; i < NetworkManager.Get().connectedClients.Count; i++)
+                using(List<ulong>.Enumerator clients = NetworkManager.Get().clients)
                 {
-                    if(NetworkManager.Get().isServer && NetworkManager.Get().connectedClients[i] == NetworkManager.Get().serverID)
-                        continue;
+                    while(clients.MoveNext())
+                    {
+                        if(NetworkManager.Get().isServer && clients.Current == NetworkManager.Get().serverID)
+                            continue;
 
-                    NetworkManager.Get().transport.Send(NetworkManager.Get().connectedClients[i], new ArraySegment<byte>(stream.GetBuffer(), 0, (int)stream.Length), channel);
+                        NetworkManager.Get().transport.Send(clients.Current, new ArraySegment<byte>(stream.GetBuffer(), 0, (int)stream.Length), channel);
+                    }
                 }
             }
         }
@@ -176,15 +175,18 @@ namespace Isaac.Network.Messaging
 
             using(BitStream stream = MessagePacker.WrapMessage(messageType, 0, messageStream, SecuritySendFlags.None))
             {
-                for(int i = 0; i < NetworkManager.Get().connectedClients.Count; i++)
+                using(List<ulong>.Enumerator clients = NetworkManager.Get().clients)
                 {
-                    if(NetworkManager.Get().connectedClients[i] == clientIDToIgnore ||
-                        (NetworkManager.Get().isServer && NetworkManager.Get().connectedClients[i] == NetworkManager.Get().serverID))
-                        continue;
+                    while(clients.MoveNext())
+                    {
+                        if(clients.Current == clientIDToIgnore ||
+                            (NetworkManager.Get().isServer && clients.Current == NetworkManager.Get().serverID))
+                            continue;
 
-                    NetworkManager.Get().transport.Send(NetworkManager.Get().connectedClients[i], new ArraySegment<byte>(stream.GetBuffer(), 0, (int)stream.Length), channel);
+                        NetworkManager.Get().transport.Send(clients.Current, new ArraySegment<byte>(stream.GetBuffer(), 0, (int)stream.Length), channel);
+                    }
                 }
             }
         }
     }
-}   
+}

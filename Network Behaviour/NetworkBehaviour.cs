@@ -201,6 +201,7 @@ namespace Isaac.Network
         private NetworkManager m_NetworkManager = null;
         private NetworkBehaviourManager m_NetworkBehaviourManager = null;
         private ulong m_NetworkID = 0;
+        private ulong m_UniqueHash = 0;
         private bool m_IsNetworkSpawned = false;
         private bool m_IsNetworkReady = false;
         private bool m_DestroyOnUnspawn = true;
@@ -241,7 +242,7 @@ namespace Isaac.Network
         /// </summary>
         /// <param name="ownerID">The client ID of the target client that will be the owner of this Network Behaviour.</param>
         /// <param name="observers">The list of clients that will have visibility of this Network Behaviour.</param>
-        public void SpawnOnNetwork(ulong ownerID, List<ulong>.Enumerator observers, Stream stream = null)
+        public void SpawnOnNetwork(ulong ownerID, List<ulong> observers, Stream stream = null)
         {
             if(!IsValidSpawn()) return;
 
@@ -278,7 +279,7 @@ namespace Isaac.Network
             return true;
         }
 
-        private void DoSpawnOnNetwork(ulong ownerID, List<ulong>.Enumerator? observers, Stream stream)
+        private void DoSpawnOnNetwork(ulong ownerID, List<ulong> observers, Stream stream)
         {
 #if UNITY_EDITOR
             m_KnownUniqueID = m_UniqueID;
@@ -287,21 +288,19 @@ namespace Isaac.Network
             if(stream != null)
                 Debug.LogWarning("Stream parameter is not yet implemented.");
 
+            m_UniqueHash = m_UniqueID.GetStableHash(networkManager.config.rpcHashSize);
+
             if(isServer) //Server
             {
-                if(observers == null)
-                {
-                    observers = networkManager.connectedClients.GetEnumerator();
-                }
-
                 try
                 {
                     m_IsNetworkSpawned = true;
-                    m_NetworkBehaviourManager.SpawnOnNetworkServer(this, OnBehaviourConnected, OnBehaviourDisconnected, OnServerRPCReceived, ownerID, observers.Value);
+                    m_NetworkBehaviourManager.SpawnOnNetworkServer(this, OnBehaviourConnected, OnBehaviourDisconnected, OnServerRPCReceived, ownerID, observers);
                 }
                 catch(Exception ex)
                 {
                     m_IsNetworkSpawned = false;
+                    //Look down the call stack for the source of the exception
                     throw ex;
                 }
             }
@@ -373,17 +372,45 @@ namespace Isaac.Network
         protected virtual void OnNetworkShutdown() { }
 
         //Server
-        private void OnBehaviourConnected(ulong newNetworkID, ulong clientID)
+        private void OnBehaviourConnected(ulong newNetworkID, ulong clientID, List<ulong> observers)
         {
             m_NetworkID = newNetworkID;
 
-            //Update observers
-            m_PendingObservers.Remove(clientID);
-            m_Observers.Add(clientID);
+            //Since were the server, send all the specified observers(clients) the spawning Network Behaviour
+            if(clientID == networkManager.serverID)
+            {
+                //Set early since this will be called 
+                m_IsNetworkSpawned = true;
+                m_IsNetworkReady = true;
 
-            //Set early since this will be called 
-            m_IsNetworkSpawned = true;
-            m_IsNetworkReady = true;
+                //Add server as observer
+                m_Observers.Add(clientID);
+
+                if(observers == null)
+                    NetworkShowAll();
+                else
+                    NetworkShow(observers);
+            }
+            else
+            {
+                if(m_PendingObservers.Remove(clientID))
+                {
+                    m_Observers.Add(clientID);
+                }
+                else
+                {
+                    if(m_Observers.Contains(clientID))
+                    {
+                        Debug.LogError("Client '" + clientID + "' sent a successful visibility message when it was already an observer.");
+                        return;
+                    }
+                    else
+                    {
+                        Debug.LogError("Client '" + clientID + "' sent a successful visibility message when it is not pending visibility.");
+                        return;
+                    }
+                }
+            }
 
             //Call Network start function
             OnNetworkReady(clientID);

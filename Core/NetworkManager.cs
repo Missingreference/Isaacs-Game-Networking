@@ -117,14 +117,20 @@ namespace Isaac.Network
 		public float networkTime => Time.unscaledTime + m_CurrentNetworkTimeOffset;
 
         /// <summary>
-        /// Gets a list of connected clients
+        /// The enumerator of the list of clients.
         /// </summary>
-        public readonly List<ulong> connectedClients = new List<ulong>();
-		/// <summary>
-		/// Gets a dictionary of the clients that have been accepted by the transport but are still pending by the MLAPI.
-		/// </summary>
-		public readonly Dictionary<ulong, PendingClient> pendingClients = new Dictionary<ulong, PendingClient>();
+        public List<ulong>.Enumerator clients => m_ConnectedClients.GetEnumerator();
 
+        /// <summary>
+        /// The number of clients that are connected.
+        /// </summary>
+        public int connectedClientCount => m_ConnectedClients.Count;
+
+        /// <summary>
+        /// Gets the enumerator of the clients that have been accepted by the transport but are still pending by MLAPI.
+        /// </summary>
+        public List<PendingClient>.Enumerator pendingClients => m_PendingClients.GetEnumerator();
+        
 		//Events
         /// <summary>
         /// Called on the server when a client connects.
@@ -154,9 +160,16 @@ namespace Isaac.Network
         /// </summary>
         public byte timeSyncChannel { get; private set; } = NetworkTransport.INVALID_CHANNEL;
 
+        /// <summary>
+        /// If true, the Network Manager, Transport and Modules will log developer messages to Unity.
+        /// </summary>
         public bool enableLogging = false;
 
         //Private
+        private readonly List<ulong> m_ConnectedClients = new List<ulong>();
+        private readonly Dictionary<ulong, PendingClient> m_PendingClientsDictionary = new Dictionary<ulong, PendingClient>();
+        private readonly List<PendingClient> m_PendingClients = new List<PendingClient>();
+
         private readonly List<NetworkModule> m_Modules = new List<NetworkModule>();
         private NetworkMessageHandler m_MessageHandler;
 
@@ -180,7 +193,7 @@ namespace Isaac.Network
 
 		void Start()
         {
-            //Used for showing the log in debug build
+            //Used for showing the log in debug build. Will be removed once this project is feature complete.
             if(Debug.isDebugBuild && !Application.isEditor) Debug.LogError("Init");
         }
 
@@ -383,7 +396,7 @@ namespace Isaac.Network
 
 			ulong hostID = transport.serverID;
 
-            connectedClients.Add(hostID);
+            m_ConnectedClients.Add(hostID);
 
             for(int i = 0; i < m_Modules.Count; i++)
             {
@@ -399,31 +412,34 @@ namespace Isaac.Network
                 Debug.Log("StopServer called");
 
             HashSet<ulong> disconnectedIDs = new HashSet<ulong>();
-            //(MLAPI COMMENT not Isaac) Don't know if I have to disconnect the clients. I'm assuming the NetworkTransport does all the cleaning on shtudown. But this way the clients get a disconnect message from server (so long it doesn't get lost)
 
-            //foreach(KeyValuePair<ulong, NetworkedClient> pair in connectedClientsDictionary)
-            for(int i = 0; i < connectedClients.Count; i++)
+            //(MLAPI COMMENT): Don't know if I have to disconnect the clients. I'm assuming the NetworkTransport does all the cleaning on shtudown. But this way the clients get a disconnect message from server (so long it doesn't get lost)
+
+            //Disconnect connected clients
+            for(int i = 0; i < m_ConnectedClients.Count; i++)
             {
-                if(!disconnectedIDs.Contains(connectedClients[i]))
+                if(!disconnectedIDs.Contains(m_ConnectedClients[i]))
                 {
-                    disconnectedIDs.Add(connectedClients[i]);
+                    disconnectedIDs.Add(m_ConnectedClients[i]);
 
-                    if(connectedClients[i] == transport.serverID)
+                    if(m_ConnectedClients[i] == transport.serverID)
                         continue;
 
-                    transport.DisconnectRemoteClient(connectedClients[i]);
+                    transport.DisconnectRemoteClient(m_ConnectedClients[i]);
                 }
             }
 
-            foreach(KeyValuePair<ulong, PendingClient> pair in pendingClients)
+            //Disconnect pending clients
+            for(int i = 0; i < m_PendingClients.Count; i++)
             {
-                if(!disconnectedIDs.Contains(pair.Key))
+                if(!disconnectedIDs.Contains(m_PendingClients[i].clientID))
                 {
-                    disconnectedIDs.Add(pair.Key);
-                    if(pair.Key == transport.serverID)
+                    disconnectedIDs.Add(m_PendingClients[i].clientID);
+
+                    if(m_PendingClients[i].clientID == transport.serverID)
                         continue;
 
-                    transport.DisconnectRemoteClient(pair.Key);
+                    transport.DisconnectRemoteClient(m_PendingClients[i].clientID);
                 }
             }
 
@@ -456,20 +472,13 @@ namespace Isaac.Network
 		{
 			if (!isServer)
 			{
-				Debug.LogError("Only server can disconnect remote clients. Use StopClient instead.");
+				Debug.LogError("Only server can disconnect remote clients. Use StopClient instead if trying to disconnect local client.");
 				return;
 			}
 
-			if (pendingClients.ContainsKey(targetClientID))
-				pendingClients.Remove(targetClientID);
+            OnClientDisconnectFromServer(targetClientID);
 
-			for (int i = connectedClients.Count - 1; i > -1; i--)
-			{
-				if (connectedClients[i] == targetClientID)
-					connectedClients.RemoveAt(i);
-			}
-
-			transport.DisconnectRemoteClient(targetClientID);
+            transport.DisconnectRemoteClient(targetClientID);
 		}
 
         #region Module Management
@@ -564,8 +573,9 @@ namespace Isaac.Network
             m_LastEventTickTime = 0f;
             m_LastReceiveTickTime = 0f;
             m_EventOvershootCounter = 0f;
-            pendingClients.Clear();
-            connectedClients.Clear();
+            m_PendingClients.Clear();
+            m_PendingClientsDictionary.Clear();
+            m_ConnectedClients.Clear();
 
             ResponseMessageManager.Clear();
 
@@ -718,7 +728,7 @@ namespace Isaac.Network
             if(Debug.isDebugBuild)
             {
                 //Network Log Module
-                SafeLoadModule<NetworkLogModule>();
+                //SafeLoadModule<NetworkLogModule>();
             }
         }
 
@@ -730,11 +740,12 @@ namespace Isaac.Network
 
 					if (isServer)
 					{
-						pendingClients.Add(sendingClientID, new PendingClient()
-						{
-							clientID = sendingClientID,
-							connectionState = PendingClient.State.PendingConnection
-						});
+                        m_PendingClients.Add(new PendingClient()
+                        {
+                            clientID = sendingClientID,
+                            connectionState = PendingClient.State.PendingConnection
+                        });
+                        m_PendingClientsDictionary.Add(sendingClientID, m_PendingClients[m_PendingClients.Count - 1]); 
 						StartCoroutine(ApprovalTimeout(sendingClientID));
 					}
 					else
@@ -804,7 +815,7 @@ namespace Isaac.Network
                     Debug.Log("Data Header: messageType=" + m_MessageHandler.GetMessageName(messageType) + "(" + messageType + ")");
 
 				// Client tried to send a network message that was not the connection request before they were accepted
-				if (pendingClients.ContainsKey(sendingClientID) && pendingClients[sendingClientID].connectionState == PendingClient.State.PendingConnection && messageType != (byte)MessageType.NETWORK_CONNECTION_REQUEST)
+				if (m_PendingClientsDictionary.ContainsKey(sendingClientID) && m_PendingClientsDictionary[sendingClientID].connectionState == PendingClient.State.PendingConnection && messageType != (byte)MessageType.NETWORK_CONNECTION_REQUEST)
 				{
 					Debug.LogWarning("Message received from clientID " + sendingClientID + " before it has been accepted. Message type: (" + messageType.ToString() + ") " + m_MessageHandler.GetMessageName(messageType));
 					return;
@@ -834,12 +845,12 @@ namespace Isaac.Network
 		{
 			float timeStarted = networkTime;
 			//We yield every frame incase a pending client disconnects and someone else gets its connection id
-			while (networkTime - timeStarted < config.clientConnectionBufferTimeout && pendingClients.ContainsKey(connectingClientID))
+			while (networkTime - timeStarted < config.clientConnectionBufferTimeout && m_PendingClientsDictionary.ContainsKey(connectingClientID))
 			{
 				yield return null;
 			}
 
-			if (pendingClients.ContainsKey(connectingClientID) && !connectedClients.Contains(connectingClientID))//connectedClientsDictionary.ContainsKey(clientId))
+			if (m_PendingClientsDictionary.ContainsKey(connectingClientID) && !m_ConnectedClients.Contains(connectingClientID))
             {
                 //Timeout
                 if(enableLogging)
@@ -866,9 +877,22 @@ namespace Isaac.Network
 
 		private void OnClientDisconnectFromServer(ulong disconnectingClientID)
         {
-            pendingClients.Remove(disconnectingClientID);
-            connectedClients.Remove(disconnectingClientID);
-		}
+            if(m_PendingClientsDictionary.Remove(disconnectingClientID))
+            {
+                for(int i = 0; i < m_PendingClients.Count; i++)
+                {
+                    if(m_PendingClients[i].clientID == disconnectingClientID)
+                    {
+                        m_PendingClients.RemoveAt(i);
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                m_ConnectedClients.Remove(disconnectingClientID);
+            }
+        }
 
 		private void SyncTime()
 		{
@@ -888,16 +912,26 @@ namespace Isaac.Network
 
 		private void HandleApproval(ulong sendingClientID, bool approved)
 		{
-			if (approved)
+			if (approved) //Inform new client it got approved
 			{
-				//Inform new client it got approved
-				if(pendingClients.ContainsKey(sendingClientID))
-					pendingClients.Remove(sendingClientID);
-				connectedClients.Add(sendingClientID);
+				//Move pending client to connected client
+                if(m_PendingClientsDictionary.Remove(sendingClientID))
+                {
+                    for(int i = 0; i < m_PendingClients.Count; i++)
+                    {
+                        if(m_PendingClients[i].clientID == sendingClientID)
+                        {
+                            m_PendingClients.RemoveAt(i);
+                            break;
+                        }
+                    }
+                }
+				m_ConnectedClients.Add(sendingClientID);
 
 				// This packet is unreliable, but if it gets through it should provide a much better sync than the potentially huge approval message.
 				SyncTime();
 
+                //Do message
 				using (PooledBitStream stream = PooledBitStream.Get())
 				{
 					using (PooledBitWriter writer = PooledBitWriter.Get(stream))
@@ -909,25 +943,38 @@ namespace Isaac.Network
 						writer.WriteUInt32Packed(0);
 
 						MessageSender.Send(sendingClientID, MessageType.NETWORK_CONNECTION_APPROVED, networkInternalChannel, stream);
-
-                        for(int i = 0; i < m_Modules.Count; i++)
-                        {
-                            m_Modules[i].OnClientConnect(sendingClientID);
-                        }
-
-						onClientConnect?.Invoke(sendingClientID);
 					}
 				}
-			}
-			else
-			{
-				if (pendingClients.ContainsKey(sendingClientID))
-					pendingClients.Remove(sendingClientID);
 
-				transport.DisconnectRemoteClient(sendingClientID);
+                //Let our modules know of a new client connected
+                for(int i = 0; i < m_Modules.Count; i++)
+                {
+                    m_Modules[i].OnClientConnect(sendingClientID);
+                }
+
+                //Invoke public client connect event
+                onClientConnect?.Invoke(sendingClientID);
+            }
+			else
+            {
+                //Remove pending client
+                if(m_PendingClientsDictionary.Remove(sendingClientID))
+                {
+                    for(int i = 0; i < m_PendingClients.Count; i++)
+                    {
+                        if(m_PendingClients[i].clientID == sendingClientID)
+                        {
+                            m_PendingClients.RemoveAt(i);
+                            break;
+                        }
+                    }
+                }
+
+                transport.DisconnectRemoteClient(sendingClientID);
 			}
 		}
 
+        #region Network Message Handling
 
         private void HandleConnectionRequest(ulong sendingClientID, Stream stream, float receiveTime)
         {
@@ -953,7 +1000,7 @@ namespace Isaac.Network
 
                 float netTime = reader.ReadSinglePacked();
                 UpdateNetworkTime(sendingClientID, netTime, receiveTime, true);
-                connectedClients.Add(sendingClientID);
+                m_ConnectedClients.Add(sendingClientID);
                 isConnected = true;
 
                 for(int i = 0; i < m_Modules.Count; i++)
@@ -972,6 +1019,8 @@ namespace Isaac.Network
                 UpdateNetworkTime(sendingClientID, netTime, receiveTime);
             }
         }
+
+        #endregion
 
     } //Class
 } //Namespace

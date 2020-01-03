@@ -119,7 +119,19 @@ namespace Isaac.Network.Development
                     return;
                 }
 
-                if(!networkManager.connectedClients.Contains(clientID))
+                bool IsClient(ulong ID)
+                {
+                    using(List<ulong>.Enumerator clients = networkManager.clients)
+                    {
+                        while(clients.MoveNext())
+                        {
+                            if(clients.Current == clientID) return true;
+                        }
+                    }
+                    return false;
+                }
+
+                if(!IsClient(clientID))
                 {
                     Debug.LogError("Tried to toggle remote target for sending logs but the client ID '" + clientID + "' is not in the connected clients list.");
                     return;
