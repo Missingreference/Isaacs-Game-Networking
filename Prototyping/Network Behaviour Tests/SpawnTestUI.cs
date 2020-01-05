@@ -200,7 +200,7 @@ public class SpawnTestUI : MonoBehaviour
             catch(NotServerException ex)
             {
                 m_LeftOwnerUnspawnToggle.SetIsOnWithoutNotify(leftNetworkSquare.ownerCanUnspawn);
-                throw ex;
+                throw;
             }
         }
     }

@@ -301,7 +301,7 @@ namespace Isaac.Network
                 {
                     m_IsNetworkSpawned = false;
                     //Look down the call stack for the source of the exception
-                    throw ex;
+                    throw;
                 }
             }
             else //Client

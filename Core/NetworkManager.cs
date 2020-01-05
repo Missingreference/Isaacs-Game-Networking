@@ -310,7 +310,7 @@ namespace Isaac.Network
             {
                 Debug.LogError("The transport '" + transport.GetType().ToString() + "' ran into an internal issue when trying to start server. Shutting down and throwing exception...");
                 Shutdown();
-                throw ex;
+                throw;
             }
 
             isServer = true;
@@ -348,7 +348,7 @@ namespace Isaac.Network
             {
                 Debug.LogError("The transport '" + transport.GetType().ToString() + "' ran into an internal issue when trying to start client. Shutting down and throwing exception...");
                 Shutdown();
-                throw ex;
+                throw;
             }
 
 			isClient = true;
@@ -388,7 +388,7 @@ namespace Isaac.Network
             {
                 Debug.LogError("The transport '" + transport.GetType().ToString() + "' ran into an internal issue when trying to start server. Shutting down and throwing exception...");
                 Shutdown();
-                throw ex;
+                throw;
             }
 
 			isServer = true;
@@ -666,7 +666,7 @@ namespace Isaac.Network
             {
                 Debug.LogError("The transport '" + transport.GetType().ToString() + "' ran into an internal issue when trying to initialize. Shutting down and throwing exception...");
                 Shutdown();
-                throw ex;
+                throw;
             }
 		}
 
