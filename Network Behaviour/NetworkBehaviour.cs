@@ -324,7 +324,7 @@ namespace Isaac.Network
                 catch(Exception ex)
                 {
                     m_IsNetworkSpawned = false;
-                    throw ex;
+                    throw;
                 }
             }
         }
