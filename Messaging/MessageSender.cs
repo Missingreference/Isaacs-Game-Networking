@@ -9,6 +9,9 @@ using BitStream = MLAPI.Serialization.BitStream;
 
 namespace Isaac.Network.Messaging
 {
+    /// <summary>
+    /// Warning none of these check if the client ID parameter is a valid client to save on performance. Use at your own risk.
+    /// </summary>
     static class MessageSender
     {
         static public void Send(ulong clientID, MessageType messageType, BitStream messageStream)

@@ -109,7 +109,7 @@ namespace MLAPI.NetworkedVar.Collections
                 case NetworkedVarPermission.ServerOnly:
                     return false;
                 case NetworkedVarPermission.OwnerOnly:
-                    return networkedBehaviour.ownerClientID == clientId;
+                    return networkedBehaviour.ownerID == clientId;
                 case NetworkedVarPermission.Custom:
                     {
                         if(Settings.WritePermissionCallback == null) return false;
@@ -130,7 +130,7 @@ namespace MLAPI.NetworkedVar.Collections
                 case NetworkedVarPermission.ServerOnly:
                     return false;
                 case NetworkedVarPermission.OwnerOnly:
-                    return networkedBehaviour.ownerClientID == clientId;
+                    return networkedBehaviour.ownerID == clientId;
                 case NetworkedVarPermission.Custom:
                     {
                         if(Settings.ReadPermissionCallback == null) return false;

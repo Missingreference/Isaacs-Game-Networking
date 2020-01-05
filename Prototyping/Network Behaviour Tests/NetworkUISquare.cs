@@ -41,4 +41,24 @@ public class NetworkUISquare : NetworkBehaviour
     {
 
     }
+
+    protected override void OnNetworkReady(ulong clientID)
+    {
+
+    }
+
+    protected override void OnNetworkShutdown()
+    {
+
+    }
+
+    protected override void OnGainedOwnership()
+    {
+        Debug.Log("Gained ownership!");
+    }
+
+    protected override void OnLostOwnership()
+    {
+        Debug.Log("Lost ownership!");
+    }
 }

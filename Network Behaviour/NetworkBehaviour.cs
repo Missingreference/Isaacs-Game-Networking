@@ -166,6 +166,25 @@ namespace Isaac.Network
         }
 
         /// <summary>
+        ///
+        /// Server only.
+        /// </summary>
+        public bool networkShowOnNewClients
+        {
+            get
+            {
+                if(!isServer)
+                    throw new NotServerException("Only the server can use the 'networkShowOnNewClients' property.");
+                return m_NetworkShowOnNewClients;
+            }
+            set
+            {
+                if(!isServer)
+                    throw new NotServerException("Only the server can use the 'networkShowOnNewClients' property.");
+                m_NetworkShowOnNewClients = value;
+            }
+        }
+        /// <summary>
         /// Reference to the Network Manager.
         /// </summary>
         protected NetworkManager networkManager 
@@ -206,6 +225,7 @@ namespace Isaac.Network
         private bool m_IsNetworkReady = false;
         private bool m_DestroyOnUnspawn = true;
         private bool m_OwnerCanUnspawn = false;
+        private bool m_NetworkShowOnNewClients = true;
 
 
 #if UNITY_EDITOR
@@ -288,7 +308,8 @@ namespace Isaac.Network
             if(stream != null)
                 Debug.LogWarning("Stream parameter is not yet implemented.");
 
-            m_UniqueHash = m_UniqueID.GetStableHash(networkManager.config.rpcHashSize);
+            if(!string.IsNullOrWhiteSpace(uniqueID))
+                m_UniqueHash = uniqueID.GetStableHash(networkManager.config.rpcHashSize);
 
             if(isServer) //Server
             {
@@ -306,6 +327,14 @@ namespace Isaac.Network
             }
             else //Client
             {
+                //Check for valid unique ID
+                //Only the server can create Network Behaviours with an empty uniqueID
+                //or else the game will no longer be server-authenticated and secure.
+                if(string.IsNullOrWhiteSpace(uniqueID))
+                {
+                    throw new NotServerException("Only the server can spawn a Network Behaviour with a blank Unique ID or else clients can do willy-nilly(technical term) across the network.");
+                }
+
                 if(ownerID != networkManager.serverID)
                 {
                     throw new NotServerException("Only the server can set the owner of this Network Behaviour when spawning on the network.");
@@ -324,6 +353,7 @@ namespace Isaac.Network
                 catch(Exception ex)
                 {
                     m_IsNetworkSpawned = false;
+                    //Look down the call stack for the source of the exception
                     throw;
                 }
             }
@@ -339,7 +369,7 @@ namespace Isaac.Network
                 Debug.LogError("Cannot unspawn this Network Behaviour. It is not spawned on the network.", this);
                 return;
             }
-            if(!isOwner && !networkManager.isServer && networkManager.isClient)
+            if(!(isOwner && ownerCanUnspawn) || (!networkManager.isServer && networkManager.isClient))
             {
                 throw new NotServerException("Only the owner of this Network Behaviour or the server can unspawn this Network Behaviour.");
             }
@@ -417,13 +447,19 @@ namespace Isaac.Network
         }
 
         //Client
-        private void OnBehaviourConnected(ulong newNetworkID, bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting)
+        private void OnBehaviourConnected(ulong newNetworkID, ulong ownerID, bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting)
         {
             m_NetworkID = newNetworkID;
 
             //Set early in case the Network Behaviour Manager remote
             m_IsNetworkSpawned = true;
             m_IsNetworkReady = true;
+
+            m_OwnerClientID = ownerID;
+            if(m_OwnerClientID == networkManager.clientID)
+                OnGainedOwnership();
+            else
+                OnLostOwnership();
 
             //Update Network Behaviour properties
             m_OwnerCanUnspawn = ownerCanUnspawnSetting;

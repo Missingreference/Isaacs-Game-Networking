@@ -465,6 +465,22 @@ namespace Isaac.Network
         }
 
         /// <summary>
+        /// A straightforward check for if a ulong is a valid client. Implement your own check for performance reasons if you want to check multiple clients.
+        /// </summary>
+        /// <param name="clientID"></param>
+        /// <returns></returns>
+        public bool IsClient(ulong clientID, bool includePendingClients=true)
+        {
+            if(m_ConnectedClients.Contains(clientID)) return true;
+            if(includePendingClients)
+                using(List<PendingClient>.Enumerator pendingClientsEnumerator = m_PendingClients.GetEnumerator())
+                    while(pendingClientsEnumerator.MoveNext())
+                        if(pendingClientsEnumerator.Current.clientID == clientID)
+                            return true;
+            return false;
+        }
+
+        /// <summary>
         /// Disconnects the remote client. Server only.
         /// </summary>
         /// <param name="targetClientID">The ClientId to disconnect</param>

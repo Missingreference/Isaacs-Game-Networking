@@ -17,20 +17,20 @@ namespace MLAPI.Messaging
         private readonly int index;
         private readonly Type[] parameterTypes;
         private readonly object[] parameterRefs;
-        
+
         public static ReflectionMethod Create(MethodInfo method, ParameterInfo[] parameters, int index)
         {
             RPCAttribute[] attributes = (RPCAttribute[])method.GetCustomAttributes(typeof(RPCAttribute), true);
 
-            if (attributes.Length == 0)
+            if(attributes.Length == 0)
                 return null;
 
-            if (attributes.Length > 1)
+            if(attributes.Length > 1)
             {
                 Debug.LogWarning("Having more than one ServerRPC or ClientRPC attribute per method is not supported.");
             }
 
-            if (method.ReturnType != typeof(void) && !SerializationManager.IsTypeSupported(method.ReturnType))
+            if(method.ReturnType != typeof(void) && !SerializationManager.IsTypeSupported(method.ReturnType))
             {
                 Debug.LogWarning("Invalid return type of RPC. Has to be either void or RpcResponse<T> with a serializable type");
             }
@@ -43,7 +43,7 @@ namespace MLAPI.Messaging
             this.method = method;
             this.index = index;
 
-            if (attribute is ServerRPCAttribute serverRpcAttribute)
+            if(attribute is ServerRPCAttribute serverRpcAttribute)
             {
                 requireOwnership = serverRpcAttribute.RequireOwnership;
                 serverTarget = true;
@@ -54,7 +54,7 @@ namespace MLAPI.Messaging
                 serverTarget = false;
             }
 
-            if (parameters.Length == 2 && method.ReturnType == typeof(void) && parameters[0].ParameterType == typeof(ulong) && parameters[1].ParameterType == typeof(Stream))
+            if(parameters.Length == 2 && method.ReturnType == typeof(void) && parameters[0].ParameterType == typeof(ulong) && parameters[1].ParameterType == typeof(Stream))
             {
                 useDelegate = true;
             }
@@ -65,7 +65,7 @@ namespace MLAPI.Messaging
                 parameterTypes = new Type[parameters.Length];
                 parameterRefs = new object[parameters.Length];
 
-                for (int i = 0; i < parameters.Length; i++)
+                for(int i = 0; i < parameters.Length; i++)
                 {
                     parameterTypes[i] = parameters[i].ParameterType;
                 }
@@ -74,7 +74,7 @@ namespace MLAPI.Messaging
 
         public object Invoke(NetworkBehaviour target, ulong senderClientId, Stream stream)
         {
-            if (requireOwnership == true && senderClientId != target.ownerClientID)
+            if(requireOwnership == true && senderClientId != target.ownerID)
             {
                 Debug.LogWarning("Only owner can invoke ServerRPC that is marked to require ownership");
 
@@ -83,9 +83,9 @@ namespace MLAPI.Messaging
 
             //target.executingRpcSender = senderClientId;
 
-            if (stream.Position == 0)
+            if(stream.Position == 0)
             {
-                if (useDelegate)
+                if(useDelegate)
                 {
                     return InvokeDelegate(target, senderClientId, stream);
                 }
@@ -93,16 +93,16 @@ namespace MLAPI.Messaging
                 {
                     return InvokeReflected(target, stream);
                 }
-            } 
+            }
             else
             {
                 // Create a new stream so that the stream they get ONLY contains user data and not MLAPI headers
-                using (PooledBitStream userStream = PooledBitStream.Get())
+                using(PooledBitStream userStream = PooledBitStream.Get())
                 {
                     userStream.CopyUnreadFrom(stream);
                     userStream.Position = 0;
 
-                    if (useDelegate)
+                    if(useDelegate)
                     {
                         return InvokeDelegate(target, senderClientId, stream);
                     }
@@ -116,9 +116,9 @@ namespace MLAPI.Messaging
 
         private object InvokeReflected(NetworkBehaviour instance, Stream stream)
         {
-            using (PooledBitReader reader = PooledBitReader.Get(stream))
+            using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
-                for (int i = 0; i < parameterTypes.Length; i++)
+                for(int i = 0; i < parameterTypes.Length; i++)
                 {
                     parameterRefs[i] = reader.ReadObjectPacked(parameterTypes[i]);
                 }

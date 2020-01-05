@@ -13,7 +13,7 @@ namespace Isaac.Network
         /// <summary>
         /// Gets the client ID of the owner of this network behaviour.
         /// </summary>
-        public ulong ownerClientID
+        public ulong ownerID
         {
             get
             {
@@ -31,40 +31,76 @@ namespace Isaac.Network
         /// <summary>
         /// Gets whether the behaviour is owned by the local client. Also is true if the network manager is not running in cases where network behaviours are being used offline.
         /// </summary>
-        public bool isOwner => (networkManager != null && networkManager.isRunning && ownerClientID == networkManager.clientID) || networkManager == null || !networkManager.isRunning;
+        public bool isOwner => (networkManager != null && networkManager.isRunning && ownerID == networkManager.clientID) || networkManager == null || !networkManager.isRunning;
 
         /// <summary>
         /// Gets whether or not the object is owned by the server.
         /// </summary>
-        public bool isOwnedByServer => (networkManager != null && ownerClientID == networkManager.serverID) || networkManager == null || !networkManager.isRunning;
+        public bool isOwnedByServer => (networkManager != null && ownerID == networkManager.serverID) || networkManager == null || !networkManager.isRunning;
 
         /// <summary>
-        /// Changes the owner of the object. Can only be called from server
+        /// Changes the owner of the object. Can only be called from the server.
         /// </summary>
         /// <param name="targetClientID">The new owner clientId</param>
-        public void ChangeOwnership(ulong targetClientID)
+        public void SetOwner(ulong targetClientID)
         {
-            //TODO Reimplement ChangeOwnership
+            if(!networkManager.isRunning)
+            {
+                Debug.LogError("Cannot set ownership. The network is not running.");
+                return;
+            }
+
+            if(!isServer)
+            {
+                throw new NotServerException("Only the server can call NetworkBehaviour.SetOwner.");
+            }
+
+            if(!isNetworkSpawned)
+            {
+                throw new NetworkException("Cannot change ownership. This Network Behaviour is not spawned.");
+            }
+
+            //Owner does not change
+            if(targetClientID == ownerID) return;
+
+            if(targetClientID == networkManager.serverID) RemoveOwnership();
+
+            //TODO Send message to clients about ownership change
             throw new NotImplementedException();
         }
 
         /// <summary>
-        /// Removes all ownership of an object from any client. Can only be called from server
+        /// Removes all ownership of an object from any client. Can only be called from the server.
         /// </summary>
         public void RemoveOwnership()
         {
-            //TODO Reimplement RemoveOwnership
+            if(!networkManager.isRunning)
+            {
+                Debug.LogError("Cannot remove ownership. The network is not running.");
+                return;
+            }
+
+            if(!isServer)
+            {
+                throw new NotServerException("Only the server can call NetworkBehaviour.RemoveOwnership.");
+            }
+
+            if(!isNetworkSpawned)
+            {
+                throw new NetworkException("Cannot change ownership. This Network Behaviour is not spawned.");
+            }
+
+            //Owner does not change
+            if(isOwnedByServer) return;
+
+            OnGainedOwnership();
+
+            //TODO Send message to clients about ownership change
             throw new NotImplementedException();
         }
 
-        protected virtual void OnGainedOwnership()
-        {
-            throw new NotImplementedException();
-        }
+        protected virtual void OnGainedOwnership() { }
 
-        protected virtual void OnLostOwnership()
-        {
-            throw new NotImplementedException();
-        }
+        protected virtual void OnLostOwnership() { }
     }
 }

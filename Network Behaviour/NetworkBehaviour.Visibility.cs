@@ -131,7 +131,7 @@ namespace Isaac.Network
                 {
                     for(int i = 0; i < clientIDs.Count; i++)
                     {
-                        if(NetworkManager.Get().isServer && clientIDs[i] == NetworkManager.Get().serverID)
+                        if(clientIDs[i] == NetworkManager.Get().serverID)
                             continue;
                         if(m_PendingObservers.Contains(clientIDs[i]))
                         {
@@ -157,7 +157,7 @@ namespace Isaac.Network
         public void NetworkShowAll()
         {
             //A faster message send bypassing MessageSender completely
-            
+
             using(PooledBitStream baseStream = PooledBitStream.Get())
             {
                 DoVisibleShowWrite(baseStream);
@@ -169,7 +169,7 @@ namespace Isaac.Network
                     {
                         while(clients.MoveNext())
                         {
-                            if(NetworkManager.Get().isServer && clients.Current == NetworkManager.Get().serverID)
+                            if(clients.Current == NetworkManager.Get().serverID)
                                 continue;
                             if(m_PendingObservers.Contains(clients.Current) || m_Observers.Contains(clients.Current))
                                 continue;
@@ -200,7 +200,7 @@ namespace Isaac.Network
             {
                 //Write behaviour info and type
                 writer.WriteUInt64Packed(networkID);
-                writer.WriteUInt64Packed(ownerClientID);
+                writer.WriteUInt64Packed(ownerID);
                 writer.WriteUInt64Packed(RPCTypeDefinition.GetHashFromType(GetType()));
                 if(string.IsNullOrWhiteSpace(uniqueID))
                 {
@@ -211,6 +211,9 @@ namespace Isaac.Network
                     writer.WriteBool(true);
                     writer.WriteUInt64Packed(m_UniqueHash);
                 }
+                writer.WriteBool(ownerCanUnspawn);
+                writer.WriteBool(destroyOnUnspawn);
+
                 if(networkManager.enableLogging)
                     Debug.Log("Sending to clients the new behaviour " + GetType());
             }
@@ -223,13 +226,8 @@ namespace Isaac.Network
         /// <param name="clientID">The client to hide the object for</param>
         public void NetworkHide(ulong clientID)
         {
-            
-            if(!NetworkManager.Get().isServer)
-            {
-                throw new NotServerException("Only the server can change visibility.");
-            }
 
-            if(!m_Observers.Contains(clientID))
+            if(!m_PendingObservers.Contains(clientID) && !m_Observers.Contains(clientID))
             {
                 Debug.LogError("This Network Behaviour is already not visible to client '" + clientID + "'.", this);
                 return;
@@ -241,35 +239,101 @@ namespace Isaac.Network
                 return;
             }
 
-            if(!isNetworkSpawned)
-            {
-                Debug.LogError("This Network Behaviour is not spawned on the network. Make sure this Network Behaviour is spawned using the NetworkBehaviour.SpawnOnNetwork function before changing it's visiblity ", this);
-                return;
-            }
-
             // Send destroy call
             m_Observers.Remove(clientID);
             m_PendingObservers.Remove(clientID);
 
-            throw new NotImplementedException();
+            //Check if the client is even still connected
+            if(!networkManager.IsClient(clientID)) return;
 
-            /*
+            // Send unspawn call
             using(PooledBitStream stream = PooledBitStream.Get())
             {
-                using(PooledBitWriter writer = PooledBitWriter.Get(stream))
-                {
-                    writer.WriteUInt64Packed(networkID);
+                DoVisibleHideWrite(stream);
+                MessageSender.Send(clientID, networkBehaviourManager.unspawnMessageType, stream);
+            }
+        }
 
-                    //InternalMessageSender.SendToAll(MessageType.NETWORK_DESTROY_OBJECT, "NETWORK_INTERNAL", stream);
+        public void NetworkHide(List<ulong> clientIDs)
+        {
+            //A faster message send bypassing MessageSender completely
+
+            if(clientIDs == null)
+            {
+                throw new ArgumentNullException(nameof(clientIDs));
+            }
+
+            using(PooledBitStream baseStream = PooledBitStream.Get())
+            {
+                DoVisibleHideWrite(baseStream);
+                baseStream.PadStream();
+                if(clientIDs.Count == 0) return; //No one to send to.
+                using(BitStream stream = MessagePacker.WrapMessage(networkBehaviourManager.unspawnMessageType, 0, baseStream, SecuritySendFlags.None))
+                {
+                    for(int i = 0; i < clientIDs.Count; i++)
+                    {
+                        if(clientIDs[i] == networkManager.serverID)
+                            continue;
+                        if(!m_PendingObservers.Remove(clientIDs[i]) && !m_Observers.Remove(clientIDs[i]))
+                        {
+                            Debug.LogError("This Network Behaviour is already not visible to client '" + clientIDs[i] + "'.", this);
+                            continue;
+                        }
+
+                        networkManager.transport.Send(clientIDs[i], new ArraySegment<byte>(stream.GetBuffer(), 0, (int)stream.Length), networkManager.networkInternalChannel);
+                    }
                 }
             }
-            */
         }
 
         public void NetworkHideAll()
         {
+            //A faster message send bypassing MessageSender completely
 
-            throw new NotImplementedException();
+            using(PooledBitStream baseStream = PooledBitStream.Get())
+            {
+                DoVisibleHideWrite(baseStream);
+                baseStream.PadStream();
+
+                using(BitStream stream = MessagePacker.WrapMessage(networkBehaviourManager.unspawnMessageType, 0, baseStream, SecuritySendFlags.None))
+                {
+                    using(List<ulong>.Enumerator clients = networkManager.clients)
+                    {
+                        while(clients.MoveNext())
+                        {
+                            if(clients.Current == networkManager.serverID)
+                                continue;
+                            if(!m_PendingObservers.Remove(clients.Current) && !m_Observers.Remove(clients.Current))
+                                continue;
+
+                            networkManager.transport.Send(clients.Current, new ArraySegment<byte>(stream.GetBuffer(), 0, (int)stream.Length), networkManager.networkInternalChannel);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void DoVisibleHideWrite(PooledBitStream stream)
+        {
+            if(!isServer)
+            {
+                throw new NotServerException("Only the server can change visibility of a Network Behaviour.");
+            }
+
+            if(!isNetworkSpawned)
+            {
+                throw new NetworkException("This Network Behaviour is not spawned on the network. Make sure this Network Behaviour is spawned using the NetworkBehaviour.SpawnOnNetwork function before changing it's visiblity.");
+            }
+
+            //Do message
+            using(PooledBitWriter writer = PooledBitWriter.Get(stream))
+            {
+                writer.WriteUInt64Packed(networkID);
+                writer.WriteBool(destroyOnUnspawn);
+
+                if(networkManager.enableLogging)
+                    Debug.Log("Sending to clients an unspawn message for '" + GetType() + "'.");
+            }
         }
     }
 }
