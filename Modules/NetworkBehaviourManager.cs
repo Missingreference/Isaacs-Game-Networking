@@ -50,6 +50,7 @@ namespace Isaac.Network.Spawning
 
         //Used to check for hash collisions
         private readonly Dictionary<ulong, string> m_HashedStrings = new Dictionary<ulong, string>();
+        private readonly Dictionary<ulong, NetworkBehaviour> m_BehaviourByHashedID = new Dictionary<ulong, NetworkBehaviour>();
 
         private NetworkMessageHandler m_NetworkMessageHandler;
 
@@ -124,34 +125,38 @@ namespace Isaac.Network.Spawning
             }
 
             ulong newNetworkID = GetNewNetworkID();
-            ulong? uniqueHash = string.IsNullOrWhiteSpace(behaviour.uniqueID) ? null : behaviour.uniqueID?.GetStableHash(networkManager.config.rpcHashSize);
 
-            if(uniqueHash != null)
+            if(!string.IsNullOrWhiteSpace(behaviour.uniqueID))
             {
-                //Check if the unique hash has already been added.
-                if(m_NetworkBehaviourDictionary.ContainsKey(uniqueHash.Value))
+                ulong uniqueHash = behaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize);
+                if(m_BehaviourByHashedID.TryGetValue(uniqueHash, out NetworkBehaviour otherBehaviour))
                 {
-                    if(m_HashedStrings[uniqueHash.Value] == behaviour.uniqueID)
+                    if(!BehaviourWasDestroyed(otherBehaviour))
                     {
-                        Debug.LogError("A Network Behaviour already has the unique ID '" + behaviour.uniqueID + "'.");
-                        behaviour.UnspawnOnNetwork();
-                        return;
+                        throw new NetworkException("A Network Behaviour already has the unique ID '" + behaviour.uniqueID + "'.");
+                    }
+                }
+
+                if(m_HashedStrings.TryGetValue(uniqueHash, out string otherUniqueID))
+                {
+                    if(otherUniqueID == behaviour.uniqueID)
+                    {
+                        throw new NetworkException("A Network Behaviour already has the unique ID '" + behaviour.uniqueID + "'.");
                     }
                     else
                     {
                         //This occurs when 2 different strings hash to the same value from MLAPI.Hashing.GetStableHash.
-                        Debug.LogError("A hash collision occurred. Either change the unique ID or increase the hash size in the config. '" + behaviour.uniqueID + "' and '" + m_HashedStrings[uniqueHash.Value] + "' both hashed to '" + uniqueHash + "'.");
-                        behaviour.UnspawnOnNetwork();
-                        return;
+                        throw new NetworkException("A hash collision occurred. Either change the unique ID or increase the hash size in the config. '" + behaviour.uniqueID + "' and '" + otherUniqueID + "' both hashed to '" + uniqueHash + "'.");
                     }
                 }
-                m_HashedStrings.Add(uniqueHash.Value, behaviour.uniqueID);
+                m_HashedStrings.Add(uniqueHash, behaviour.uniqueID);
+                m_BehaviourByHashedID.Add(uniqueHash, behaviour);
             }
 
             m_NetworkBehaviours.Add(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedServerCallback = connectedCallback, disconnectedDelegate = disconnectCallback, localRPCDelegate = localRPCCallback });
             m_NetworkBehaviourDictionary.Add(newNetworkID, m_NetworkBehaviours[m_NetworkBehaviours.Count - 1]);
             
-            m_NetworkBehaviours[m_NetworkBehaviours.Count - 1].connectedServerCallback.Invoke(newNetworkID, networkManager.serverID, observers);
+            connectedCallback.Invoke(newNetworkID, networkManager.serverID, observers);
         }
 
         //Client only
@@ -218,6 +223,11 @@ namespace Isaac.Network.Spawning
                 throw new InvalidOperationException("NetworkBehaviourManager.UnspawnOnNetwork is only allowed to be called internally by a Network Behaviour.");
             }
 
+            DoUnspawnOnNetwork(behaviour);
+        }
+
+        private void DoUnspawnOnNetwork(NetworkBehaviour behaviour)
+        {
             if(networkManager.isServer)
             {
                 //Send to clients
@@ -265,7 +275,9 @@ namespace Isaac.Network.Spawning
             m_NetworkBehaviourDictionary.Remove(behaviourReference.networkBehaviour.networkID);
             if(!string.IsNullOrWhiteSpace(behaviourReference.networkBehaviour.uniqueID))
             {
-                m_HashedStrings.Remove(behaviourReference.networkBehaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize));
+                ulong hash = behaviourReference.networkBehaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize);
+                m_HashedStrings.Remove(hash);
+                m_BehaviourByHashedID.Remove(hash);
             }
             behaviourReference.disconnectedDelegate.Invoke(behaviourReference.networkBehaviour.ownerCanUnspawn, destroy);
         }
@@ -287,6 +299,7 @@ namespace Isaac.Network.Spawning
             if(pendingBehaviour.uniqueHash != null)
             {
                 m_HashedStrings.Remove(pendingBehaviour.uniqueHash.Value);
+                m_BehaviourByHashedID.Remove(pendingBehaviour.uniqueHash.Value);
             }
             m_LocalPendingBehavioursList.Remove(pendingBehaviour.reference.networkBehaviour);
             pendingBehaviour.reference.disconnectedDelegate.Invoke(pendingBehaviour.reference.networkBehaviour.ownerCanUnspawn, destroy);
@@ -376,7 +389,6 @@ namespace Isaac.Network.Spawning
                         //Clean up pending
                         m_LocalPendingBehaviours.Remove(uniqueHash);
                         m_LocalPendingBehavioursList.Remove(pendingBehaviour.reference.networkBehaviour);
-                        m_HashedStrings.Remove(uniqueHash);
 
                         OnObjectConnectSuccess(pendingBehaviour.reference, networkID, ownerCanUnspawn, destroyOnUnspawn);
                     }
@@ -548,8 +560,8 @@ namespace Isaac.Network.Spawning
 
             if(networkManager.isServer || (networkBehaviour.isOwner && networkBehaviour.ownerCanUnspawn)) //Server or allowed owners can destroy objects if they want but it's not the correct way of going about it
             {
-                Debug.LogWarning("Network Behaviour has been destroyed before it was Unspawned. It is recommended that the Network Behaviour is unspawned on the network before being destroyed. For example calling UnspawnOnNetwork in OnDestroy. Unspawning now...");
-                UnspawnOnNetwork(networkBehaviour);
+                Debug.LogWarning("Network Behaviour has been destroyed before it was Unspawned. It is recommended that the Network Behaviour is unspawned on the network before being destroyed. Unspawning now...");
+                DoUnspawnOnNetwork(networkBehaviour);
                 return true;
             }
             else
