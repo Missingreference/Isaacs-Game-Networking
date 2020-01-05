@@ -1012,18 +1012,19 @@ namespace Isaac.Network
         {
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
-                sendingClientID = reader.ReadUInt64Packed();
+                clientID = reader.ReadUInt64Packed();
 
                 float netTime = reader.ReadSinglePacked();
                 UpdateNetworkTime(sendingClientID, netTime, receiveTime, true);
                 m_ConnectedClients.Add(sendingClientID);
                 isConnected = true;
 
+                //Send modules and onClientConnect this client's new client ID.
                 for(int i = 0; i < m_Modules.Count; i++)
                 {
-                    m_Modules[i].OnClientConnect(sendingClientID);
+                    m_Modules[i].OnClientConnect(clientID);
                 }
-                onClientConnect?.Invoke(sendingClientID);
+                onClientConnect?.Invoke(clientID);
             }
         }
 

@@ -104,6 +104,15 @@ public class NetworkManagerWindow : MonoBehaviour
             if(networkManager.isHost)
             {
                 clientsText.text = "[Host] ID: " + networkManager.clientID + " Connected Clients: " + networkManager.connectedClientCount;
+                clientsText.text += "\nClients:";
+                using(List<ulong>.Enumerator clients = networkManager.clients)
+                {
+                    while(clients.MoveNext())
+                    {
+                        clientsText.text += " [" + clients.Current + "],";
+                    }
+                    clientsText.text = clientsText.text.Substring(0, clientsText.text.Length - 1);
+                }
                 statusText.text += " [Listening]";
             }
             else if(networkManager.isClient)
