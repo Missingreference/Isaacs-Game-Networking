@@ -61,6 +61,7 @@ public class SpawnTestUI : MonoBehaviour
     void Start()
     {
         m_NetworkManager = NetworkManager.Get();
+        m_NetworkManager.transport.RegisterChannel("Rotate Channel", ChannelType.UnreliableSequenced);
     }
 
     void Update()

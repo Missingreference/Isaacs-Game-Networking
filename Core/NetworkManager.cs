@@ -827,8 +827,8 @@ namespace Isaac.Network
 
 				uint headerByteSize = (uint)Arithmetic.VarIntSize(messageType);
 
-                if(enableLogging)
-                    Debug.Log("Data Header: messageType=" + m_MessageHandler.GetMessageName(messageType) + "(" + messageType + ")");
+                //if(enableLogging)
+                    //Debug.Log("Data Header: messageType=" + m_MessageHandler.GetMessageName(messageType) + "(" + messageType + ")");
 
 				// Client tried to send a network message that was not the connection request before they were accepted
 				if (m_PendingClientsDictionary.ContainsKey(sendingClientID) && m_PendingClientsDictionary[sendingClientID].connectionState == PendingClient.State.PendingConnection && messageType != (byte)MessageType.NETWORK_CONNECTION_REQUEST)

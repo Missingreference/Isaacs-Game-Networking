@@ -72,9 +72,9 @@ namespace MLAPI.Messaging
             }
         }
 
-        public object Invoke(NetworkBehaviour target, ulong senderClientId, Stream stream)
+        public object Invoke(RPCReference rpcReference, ulong senderClientId, Stream stream)
         {
-            if(requireOwnership == true && senderClientId != target.ownerID)
+            if(requireOwnership == true && senderClientId != rpcReference.networkBehaviour.ownerID)
             {
                 Debug.LogWarning("Only owner can invoke ServerRPC that is marked to require ownership");
 
@@ -87,11 +87,11 @@ namespace MLAPI.Messaging
             {
                 if(useDelegate)
                 {
-                    return InvokeDelegate(target, senderClientId, stream);
+                    return InvokeDelegate(rpcReference, senderClientId, stream);
                 }
                 else
                 {
-                    return InvokeReflected(target, stream);
+                    return InvokeReflected(rpcReference, stream);
                 }
             }
             else
@@ -104,17 +104,17 @@ namespace MLAPI.Messaging
 
                     if(useDelegate)
                     {
-                        return InvokeDelegate(target, senderClientId, stream);
+                        return InvokeDelegate(rpcReference, senderClientId, stream);
                     }
                     else
                     {
-                        return InvokeReflected(target, stream);
+                        return InvokeReflected(rpcReference, stream);
                     }
                 }
             }
         }
 
-        private object InvokeReflected(NetworkBehaviour instance, Stream stream)
+        private object InvokeReflected(RPCReference rpcReference, Stream stream)
         {
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
@@ -123,13 +123,13 @@ namespace MLAPI.Messaging
                     parameterRefs[i] = reader.ReadObjectPacked(parameterTypes[i]);
                 }
 
-                return method.Invoke(instance, parameterRefs);
+                return method.Invoke(rpcReference.networkBehaviour, parameterRefs);
             }
         }
 
-        private object InvokeDelegate(NetworkBehaviour target, ulong senderClientId, Stream stream)
+        private object InvokeDelegate(RPCReference rpcReference, ulong senderClientId, Stream stream)
         {
-            target.rpcDelegates[index](senderClientId, stream);
+            rpcReference.rpcDelegates[index](senderClientId, stream);
 
             return null;
         }

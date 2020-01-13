@@ -166,7 +166,7 @@ namespace MLAPI.Messaging
             delegateMethods = delegateMethodsList.ToArray();
         }
 
-        internal RPCDelegate[] CreateTargetedDelegates(NetworkBehaviour target)
+        public RPCDelegate[] CreateTargetedDelegates(NetworkBehaviour target)
         {
             if(delegateMethods.Length == 0)
                 return null;

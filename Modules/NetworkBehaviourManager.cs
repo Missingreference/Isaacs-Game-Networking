@@ -45,6 +45,7 @@ namespace Isaac.Network.Spawning
         //The pending behaviours that are expecting connect to other behaviours across the network. Client only have pending.
         //Client ulong = Unique Hash
         private readonly Dictionary<ulong, PendingNetworkBehaviour> m_LocalPendingBehaviours = new Dictionary<ulong, PendingNetworkBehaviour>();
+        private readonly Dictionary<ulong, PendingNetworkBehaviour> m_RemotePendingBehavioursHashes = new Dictionary<ulong, PendingNetworkBehaviour>();
         private readonly Dictionary<ulong, PendingNetworkBehaviour> m_RemotePendingBehaviours = new Dictionary<ulong, PendingNetworkBehaviour>();
         private readonly List<NetworkBehaviour> m_LocalPendingBehavioursList = new List<NetworkBehaviour>();
 
@@ -76,6 +77,7 @@ namespace Isaac.Network.Spawning
             m_ReleasedNetworkIDs.Clear();
             m_LocalPendingBehaviours.Clear();
             m_RemotePendingBehaviours.Clear();
+            m_RemotePendingBehavioursHashes.Clear();
             m_LocalPendingBehavioursList.Clear();
             m_HashedStrings.Clear();
             SceneManager.sceneLoaded += OnSceneLoad;
@@ -106,12 +108,12 @@ namespace Isaac.Network.Spawning
             for(int i = 0; i < m_NetworkBehaviours.Count; i++)
             {
                 if(m_NetworkBehaviours[i].networkBehaviour.isNetworkSpawned)
-                    m_NetworkBehaviours[i].networkBehaviour.UnspawnOnNetwork();
+                    DoUnspawnOnNetwork(m_NetworkBehaviours[i].networkBehaviour);
             }
             for(int i = 0; i < m_LocalPendingBehavioursList.Count; i++)
             {
                 if(m_LocalPendingBehavioursList[i].isNetworkSpawned)
-                    m_LocalPendingBehavioursList[i].UnspawnOnNetwork();
+                    DoUnspawnOnNetwork(m_LocalPendingBehavioursList[i]);
             }
             SceneManager.sceneLoaded -= OnSceneLoad;
         }
@@ -176,9 +178,10 @@ namespace Isaac.Network.Spawning
 
             ulong uniqueHash = behaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize);
 
-            if(m_RemotePendingBehaviours.TryGetValue(uniqueHash, out PendingNetworkBehaviour pendingBehaviour))
+            if(m_RemotePendingBehavioursHashes.TryGetValue(uniqueHash, out PendingNetworkBehaviour pendingBehaviour))
             {
-                m_RemotePendingBehaviours.Remove(uniqueHash);
+                m_RemotePendingBehavioursHashes.Remove(uniqueHash);
+                m_RemotePendingBehaviours.Remove(pendingBehaviour.networkID);
                 OnObjectConnectSuccess(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback }, pendingBehaviour.networkID, pendingBehaviour.ownerID, pendingBehaviour.ownerCanUnspawn, pendingBehaviour.destroyOnUnspawn);
             }
             else if(m_LocalPendingBehaviours.TryGetValue(uniqueHash, out pendingBehaviour))
@@ -320,6 +323,7 @@ namespace Isaac.Network.Spawning
                 m_BehaviourByHashedID.Remove(pendingBehaviour.uniqueHash.Value);
             }
             m_LocalPendingBehavioursList.Remove(pendingBehaviour.reference.networkBehaviour);
+
             pendingBehaviour.reference.disconnectedDelegate.Invoke(pendingBehaviour.reference.networkBehaviour.ownerCanUnspawn, destroy);
         }
 
@@ -408,14 +412,21 @@ namespace Isaac.Network.Spawning
 
                         OnObjectConnectSuccess(pendingBehaviour.reference, networkID, ownerID, ownerCanUnspawn, destroyOnUnspawn);
                     }
-                    else if(m_RemotePendingBehaviours.ContainsKey(uniqueHash))
+                    else if(m_RemotePendingBehavioursHashes.ContainsKey(uniqueHash))
                     {
                         Debug.LogError("Received duplicate 'add object' message for hash '" + uniqueHash + "'.");
                         return;
                     }
+                    else if(m_RemotePendingBehaviours.ContainsKey(networkID))
+                    {
+                        Debug.LogError("Recevied duplicate 'add object' message for network ID '" + networkID + "'.");
+                        return;
+                    }
                     else
                     {
-                        m_RemotePendingBehaviours.Add(uniqueHash, new PendingNetworkBehaviour() { isRemoteBehaviour = true, uniqueHash = uniqueHash, ownerID = ownerID, networkID = networkID, ownerCanUnspawn = ownerCanUnspawn, destroyOnUnspawn = destroyOnUnspawn });
+                        PendingNetworkBehaviour pendingBehaviourReference = new PendingNetworkBehaviour() { isRemoteBehaviour = true, uniqueHash = uniqueHash, ownerID = ownerID, networkID = networkID, ownerCanUnspawn = ownerCanUnspawn, destroyOnUnspawn = destroyOnUnspawn };
+                        m_RemotePendingBehavioursHashes.Add(uniqueHash, pendingBehaviourReference);
+                        m_RemotePendingBehaviours.Add(networkID, pendingBehaviourReference);
                     }
                 }
                 else //No unique hash
@@ -467,63 +478,83 @@ namespace Isaac.Network.Spawning
             Debug.Log("Received unspawn message");
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
-                NetworkBehaviourReference targetBehaviour;
                 ulong networkID = reader.ReadUInt64Packed();
                 bool destroy = reader.ReadBool();
-                if(!m_NetworkBehaviourDictionary.TryGetValue(networkID, out targetBehaviour))
+
+                if(m_NetworkBehaviourDictionary.TryGetValue(networkID, out NetworkBehaviourReference targetBehaviour))
                 {
-                    Debug.LogError("Target Network Behaviour with Network ID '" + networkID.ToString() + "' was not found. Nothing was unspawned.");
+                    //Unspawn a connected Network Behaviour
+                    DoLocalUnspawn(targetBehaviour, destroy || targetBehaviour.networkBehaviour.destroyOnUnspawn);
+                    return;
+                }
+                else if(m_RemotePendingBehaviours.TryGetValue(networkID, out PendingNetworkBehaviour pendingBehaviour))
+                {
+                    m_RemotePendingBehaviours.Remove(networkID);
+                    m_RemotePendingBehavioursHashes.Remove(pendingBehaviour.uniqueHash.Value);
                     return;
                 }
 
-                if(networkManager.isServer && networkManager.clientID != clientID)
-                {
-                    //Check if the client sending this destroy message is the owner of the object.
-                    if(targetBehaviour.networkBehaviour.ownerID != clientID)
-                    {
-                        Debug.LogError("Received message from client " + clientID + " trying to unspawn a Network Behaviour when they are not the owner of the Network Behaviour.");
-                        return;
-                    }
-                    else if(!targetBehaviour.networkBehaviour.ownerCanUnspawn)
-                    {
-                        Debug.LogError("Received message from client " + clientID + " trying to unspawn a Network Behaviour when they are the owner and not allowed to destroy the Network Behaviour.");
-                        return;
-                    }
-                }
-
-                DoLocalUnspawn(targetBehaviour, destroy || targetBehaviour.networkBehaviour.destroyOnUnspawn);
+                //No behaviour found connected or pending.
+                Debug.LogError("Target Network Behaviour with Network ID '" + networkID.ToString() + "' was not found. Nothing was unspawned.");
             }
         }
 
         public void HandleClientRPCMessage(ulong clientID, Stream stream, float receiveTime)
         {
             Debug.Log("Received Client RPC Message");
+            if(networkManager.isServer)
+            {
+                if(networkManager.enableLogging)
+                {
+                    Debug.LogError("Received a Client RPC message from client '" + clientID + "' when they were not supposed to send that message type. Only the server should send Client RPC messages.");
+                }
+                return;
+            }
+
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
-                
+                ulong networkID = reader.ReadUInt64Packed();
+                ulong methodHash = reader.ReadUInt64Packed();
+
+                if(!m_NetworkBehaviourDictionary.TryGetValue(networkID, out NetworkBehaviourReference behavoiurReference))
+                {
+                    Debug.LogError("Received Client RPC message but the specified network ID '" + networkID + "' is not associated with a spawned and ready Network Behaviour.");
+                    return;
+                }
+
+                if(BehaviourWasDestroyed(behavoiurReference.networkBehaviour)) return;
+
+                behavoiurReference.localRPCDelegate.Invoke(methodHash, clientID, stream);
             }
         }
 
         public void HandleServerRPCMessage(ulong clientID, Stream stream, float receiveTime)
         {
             Debug.Log("Received Server RPC Message");
+            if(!networkManager.isServer)
+            {
+                if(networkManager.enableLogging)
+                {
+                    Debug.LogError("Received a Server RPC message from client '" + clientID + "' when they were not supposed to send that message type. Only clients should send Server RPC messages.");
+                }
+                return;
+            }
+
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
                 ulong networkID = reader.ReadUInt64Packed();
                 ulong hash = reader.ReadUInt64Packed();
 
-                if(m_NetworkBehaviourDictionary.TryGetValue(networkID, out NetworkBehaviourReference targetBehaviour))
+                if(!m_NetworkBehaviourDictionary.TryGetValue(networkID, out NetworkBehaviourReference behavoiurReference))
                 {
-                    if(BehaviourWasDestroyed(targetBehaviour.networkBehaviour)) return;
-
-                    targetBehaviour.localRPCDelegate.Invoke(hash, clientID, stream);
-                    //TODO Check if the client is even allowed to send this message. Such as non-owner can invoke or is even visible to the specific client.
-                }
-                else
-                {
-                    Debug.LogError("Received Server RPC message but the specified Network ID '" + networkID + "' is not associated with a spawned and ready Network Behaviour.");
+                    Debug.LogError("Received Server RPC message but the specified network ID '" + networkID + "' is not associated with a spawned and ready Network Behaviour.");
                     return;
                 }
+
+                if(BehaviourWasDestroyed(behavoiurReference.networkBehaviour)) return;
+
+                //TODO Check if the client is even allowed to send this message. Such as non-owner can invoke or is even visible to the specific client.
+                behavoiurReference.localRPCDelegate.Invoke(hash, clientID, stream);
             }
         }
 
