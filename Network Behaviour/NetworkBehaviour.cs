@@ -316,7 +316,7 @@ namespace Isaac.Network
                 try
                 {
                     m_IsNetworkSpawned = true;
-                    m_NetworkBehaviourManager.SpawnOnNetworkServer(this, OnBehaviourConnected, OnBehaviourDisconnected, OnServerRPCReceived, ownerID, observers);
+                    m_NetworkBehaviourManager.SpawnOnNetworkServer(this, OnBehaviourConnected, OnBehaviourDisconnected, OnServerRPCReceived, OnOwnerChanged, ownerID, observers);
                 }
                 catch(Exception ex)
                 {
@@ -348,7 +348,7 @@ namespace Isaac.Network
                 try
                 {
                     m_IsNetworkSpawned = true;
-                    m_NetworkBehaviourManager.SpawnOnNetworkClient(this, OnBehaviourConnected, OnBehaviourDisconnected, OnClientRPCReceived);
+                    m_NetworkBehaviourManager.SpawnOnNetworkClient(this, OnBehaviourConnected, OnBehaviourDisconnected, OnClientRPCReceived, OnOwnerChanged);
                 }
                 catch(Exception ex)
                 {
@@ -369,7 +369,7 @@ namespace Isaac.Network
                 Debug.LogError("Cannot unspawn this Network Behaviour. It is not spawned on the network.", this);
                 return;
             }
-            if(!(isOwner && ownerCanUnspawn) || (!networkManager.isServer && networkManager.isClient))
+            if(!isServer && !(isOwner && ownerCanUnspawn))
             {
                 throw new NotServerException("Only the owner of this Network Behaviour or the server can unspawn this Network Behaviour.");
             }
@@ -501,6 +501,33 @@ namespace Isaac.Network
         private void OnServerRPCReceived(ulong hash, ulong senderClientID, Stream stream)
         {
             InvokeLocalServerRPC(hash, senderClientID, stream);
+        }
+
+        private void OnOwnerChanged(ulong newOwner, bool ownerCanUnspawn)
+        {
+            if(!isServer)
+                m_OwnerCanUnspawn = ownerCanUnspawn;
+
+            if(isOwner && networkManager.clientID != newOwner)
+            {
+                //Lost ownership!
+                m_OwnerClientID = newOwner;
+                OnLostOwnership();
+            }
+            else if(!isOwner && networkManager.clientID == newOwner)
+            {
+                //Gained ownership!
+                if(isServer)
+                {
+                    RemoveOwnership();
+                }
+                m_OwnerClientID = newOwner;
+                OnGainedOwnership();
+            }
+            else //This may seem redundant but we want ownership changes to be set before the OnGainedOwnership/OnLostOwnership call
+            {
+                m_OwnerClientID = newOwner;
+            }
         }
     } //Class
 } //Namespace

@@ -72,11 +72,11 @@ namespace MLAPI.Messaging
             }
         }
 
-        public object Invoke(RPCReference rpcReference, ulong senderClientId, Stream stream)
+        public object Invoke(RPCReference rpcReference, ulong senderClientID, Stream stream)
         {
-            if(requireOwnership == true && senderClientId != rpcReference.networkBehaviour.ownerID)
+            if(requireOwnership == true && senderClientID != rpcReference.networkBehaviour.ownerID)
             {
-                Debug.LogWarning("Only owner can invoke ServerRPC that is marked to require ownership");
+                Debug.LogWarning("Only the owner can invoke a Server RPC that is marked to require ownership. (Invoked by client ID '" + senderClientID + "' | Current owner: '" + rpcReference.networkBehaviour.ownerID + "').");
 
                 return null;
             }
@@ -87,7 +87,7 @@ namespace MLAPI.Messaging
             {
                 if(useDelegate)
                 {
-                    return InvokeDelegate(rpcReference, senderClientId, stream);
+                    return InvokeDelegate(rpcReference, senderClientID, stream);
                 }
                 else
                 {
@@ -104,7 +104,7 @@ namespace MLAPI.Messaging
 
                     if(useDelegate)
                     {
-                        return InvokeDelegate(rpcReference, senderClientId, stream);
+                        return InvokeDelegate(rpcReference, senderClientID, stream);
                     }
                     else
                     {

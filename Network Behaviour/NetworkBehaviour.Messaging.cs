@@ -16,6 +16,8 @@ namespace Isaac.Network
     {
         private RPCReference m_RPCReference;
 
+        #region Server
+
         public void InvokeServerRPC(RPCDelegate method, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
             if(isServer && !isClient)
@@ -52,6 +54,10 @@ namespace Isaac.Network
 
         public void InvokeServerRPC(RPCDelegate method, Stream messageStream, string channelName) => InvokeServerRPC(method, messageStream, networkManager.transport.GetChannelByName(channelName));
 
+        #endregion Server
+
+        #region Client
+
         public void InvokeClientRPC(RPCDelegate method, ulong clientID, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
             if(!isServer && isClient)
@@ -72,11 +78,11 @@ namespace Isaac.Network
 
                     stream.CopyFrom(messageStream);
 
-                    if(isHost)
+                    if(isHost && clientID == networkManager.clientID)
                     {
                         messageStream.Position = 0;
                         //Invoke local
-                        InvokeLocalClientRPC(hash, networkManager.clientID, stream);
+                        InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
                     }
                     else
                     {
@@ -100,69 +106,8 @@ namespace Isaac.Network
 
         public void InvokeClientRPC(RPCDelegate method, ulong clientID, Stream messageStream, string channelName) => InvokeClientRPC(method, clientID, messageStream, networkManager.transport.GetChannelByName(channelName));
 
-        /*
-        internal RpcResponse<T> SendServerRPCPerformanceResponse<T>(ulong hash, Stream messageStream, string channel)
-        {
-            if(!IsClient && IsRunning)
-            {
-                //We are ONLY a server.
-                if(LogHelper.CurrentLogLevel <= LogLevel.Normal) LogHelper.LogWarning("Only client and host can invoke ServerRPC");
-                return null;
-            }
-
-            ulong responseId = ResponseMessageManager.GenerateMessageId();
-
-            using(PooledBitStream stream = PooledBitStream.Get())
-            {
-                using(PooledBitWriter writer = PooledBitWriter.Get(stream))
-                {
-                    writer.WriteUInt64Packed(NetworkId);
-                    writer.WriteUInt16Packed(NetworkedObject.GetOrderIndex(this));
-                    writer.WriteUInt64Packed(hash);
-
-                    if(!IsHost) writer.WriteUInt64Packed(responseId);
-
-                    stream.CopyFrom(messageStream);
-
-                    if(IsHost)
-                    {
-                        messageStream.Position = 0;
-                        object result = InvokeServerRPCLocal(hash, NetworkingManager.Singleton.LocalClientId, messageStream);
-
-                        return new RpcResponse<T>()
-                        {
-                            Id = responseId,
-                            IsDone = true,
-                            IsSuccessful = true,
-                            Result = result,
-                            Type = typeof(T),
-                            ClientId = NetworkingManager.Singleton.ServerClientId
-                        };
-                    }
-                    else
-                    {
-                        RpcResponse<T> response = new RpcResponse<T>()
-                        {
-                            Id = responseId,
-                            IsDone = false,
-                            IsSuccessful = false,
-                            Type = typeof(T),
-                            ClientId = NetworkingManager.Singleton.ServerClientId
-                        };
-
-                        ResponseMessageManager.Add(response.Id, response);
-
-                        InternalMessageSender.Send(NetworkingManager.Singleton.ServerClientId, MLAPIConstants.MLAPI_SERVER_RPC_REQUEST, string.IsNullOrEmpty(channel) ? "MLAPI_DEFAULT_MESSAGE" : channel, stream, security, null);
-
-                        return response;
-                    }
-                }
-            }
-        }*/
 
         //Does not invoke on all clients but rather invokes on ALL (not pending)observers.
-        public void InvokeClientRPCAll(RPCDelegate method, Stream messageStream, string channelName) => InvokeClientRPCAll(method, messageStream, networkManager.transport.GetChannelByName(channelName));
-
         public void InvokeClientRPCAll(RPCDelegate method, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
             if(!isServer && isClient)
@@ -191,7 +136,7 @@ namespace Isaac.Network
                             {
                                 //Invoke local
                                 messageStream.Position = 0;
-                                InvokeLocalClientRPC(hash, networkManager.clientID, stream);
+                                InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
                             }
 
                             //Send to remote observer
@@ -202,7 +147,8 @@ namespace Isaac.Network
             }
         }
 
-        public void InvokeClientRPCAllExcept(RPCDelegate method, ulong clientIDToIgnore, Stream messageStream, string channelName) => InvokeClientRPCAllExcept(method, clientIDToIgnore, messageStream, networkManager.transport.GetChannelByName(channelName));
+        public void InvokeClientRPCAll(RPCDelegate method, Stream messageStream, string channelName) => InvokeClientRPCAll(method, messageStream, networkManager.transport.GetChannelByName(channelName));
+
 
         public void InvokeClientRPCAllExcept(RPCDelegate method, ulong clientIDToIgnore, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
@@ -233,7 +179,7 @@ namespace Isaac.Network
                             {
                                 //Invoke local
                                 messageStream.Position = 0;
-                                InvokeLocalClientRPC(hash, networkManager.clientID, stream);
+                                InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
                             }
 
                             //Send to remote observer
@@ -244,187 +190,11 @@ namespace Isaac.Network
             }
         }
 
-        /*
-        internal void SendClientRPCPerformance(ulong hash, List<ulong> clientIDs, Stream messageStream, string channel = null)
-        {
-            if(!networkManager.isServer && networkManager.isClient)
-            {
-                //We are NOT a server.
-                Debug.LogWarning("Only clients and host can invoke ClientRPC");
-                return;
-            }
+        public void InvokeClientRPCAllExcept(RPCDelegate method, ulong clientIDToIgnore, Stream messageStream, string channelName) => InvokeClientRPCAllExcept(method, clientIDToIgnore, messageStream, networkManager.transport.GetChannelByName(channelName));
 
-            using(PooledBitStream stream = PooledBitStream.Get())
-            {
-                using(PooledBitWriter writer = PooledBitWriter.Get(stream))
-                {
-                    writer.WriteUInt64Packed(networkID);
-                    writer.WriteUInt64Packed(hash);
+        #endregion Client
 
-                    stream.CopyFrom(messageStream);
-
-                    if(clientIDs == null) //Since this list is null it is assumed it will be sent to all clients. If no clients is wanted then the parameter should be an empty list.
-                    {
-                        using(List<ulong>.Enumerator clients = networkManager.clients)
-                        {
-                            while(clients.MoveNext())
-                            {
-                                if(!IsNetworkVisibleTo(clients.Current))
-                                {
-                                    if(networkManager.enableLogging)
-                                    {
-                                        Debug.LogWarning("Silently suppressed ClientRPC on target client '" + clients.Current + "' because it is not visible to the target client.");
-                                    }
-                                    continue;
-                                }
-                                if(networkManager.isHost && clients.Current == networkManager.clientID)
-                                {
-                                    messageStream.Position = 0;
-                                    InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
-                                }
-                                else
-                                {
-                                    MessageSender.Send(clients.Current, networkBehaviourManager.clientRPCMessageType, string.IsNullOrEmpty(channel) ? "NETWORK_DEFAULT" : channel, stream);
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        for(int i = 0; i < clientIDs.Count; i++)
-                        {
-
-                            if(networkManager.isHost && clientIDs[i] == networkManager.clientID)
-                            {
-                                messageStream.Position = 0;
-                                InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
-                            }
-                            else
-                            {
-                                MessageSender.Send(clientIDs[i], networkBehaviourManager.clientRPCMessageType, string.IsNullOrEmpty(channel) ? "NETWORK_DEFAULT" : channel, stream);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        internal void SendClientRPCPerformance(ulong hash, Stream messageStream, ulong clientIDToIgnore, string channel = null)
-        {
-            if(!networkManager.isServer && networkManager.isClient)
-            {
-                //We are NOT a server.
-                Debug.LogWarning("Only clients and host can invoke ClientRPC");
-                return;
-            }
-
-            using(PooledBitStream stream = PooledBitStream.Get())
-            {
-                using(PooledBitWriter writer = PooledBitWriter.Get(stream))
-                {
-                    writer.WriteUInt64Packed(networkID);
-                    //writer.WriteUInt16Packed(NetworkedObject.GetOrderIndex(this));
-                    writer.WriteUInt64Packed(hash);
-
-                    stream.CopyFrom(messageStream);
-
-                    using(List<ulong>.Enumerator clients = networkManager.clients)
-                    {
-                        while(clients.MoveNext())
-                        {
-                            if(clients.Current == clientIDToIgnore)
-                                continue;
-
-                            if(!IsNetworkVisibleTo(clients.Current))
-                            {
-                                if(networkManager.enableLogging)
-                                {
-                                    Debug.LogWarning("Silently suppressed ClientRPC on target client '" + clients.Current + "' because it is not visible to the target client.");
-                                }
-                                continue;
-                            }
-
-                            if(networkManager.isHost && clients.Current == networkManager.clientID)
-                            {
-                                messageStream.Position = 0;
-                                InvokeLocalClientRPC(hash, networkManager.clientID, messageStream);
-                            }
-                            else
-                            {
-                                MessageSender.Send(clients.Current, networkBehaviourManager.clientRPCMessageType, string.IsNullOrEmpty(channel) ? "NETWORK_DEFAULT" : channel, stream);
-                            }
-                        }
-                    }
-                }
-            }
-        }*/
-
-        /*
-        internal RpcResponse<T> SendClientRPCPerformanceResponse<T>(ulong hash, ulong clientId, Stream messageStream, string channel, SecuritySendFlags security)
-        {
-            if(!IsServer && IsRunning)
-            {
-                //We are NOT a server.
-                if(LogHelper.CurrentLogLevel <= LogLevel.Normal) LogHelper.LogWarning("Only clients and host can invoke ClientRPC");
-                return null;
-            }
-
-            if(!this.NetworkedObject.observers.Contains(clientId))
-            {
-                if(LogHelper.CurrentLogLevel <= LogLevel.Normal) LogHelper.LogWarning("Cannot send ClientRPC to client without visibility to the object");
-                return null;
-            }
-
-            ulong responseId = ResponseMessageManager.GenerateMessageId();
-
-            using(PooledBitStream stream = PooledBitStream.Get())
-            {
-                using(PooledBitWriter writer = PooledBitWriter.Get(stream))
-                {
-                    writer.WriteUInt64Packed(NetworkId);
-                    writer.WriteUInt16Packed(NetworkedObject.GetOrderIndex(this));
-                    writer.WriteUInt64Packed(hash);
-
-                    if(!(IsHost && clientId == NetworkingManager.Singleton.LocalClientId)) writer.WriteUInt64Packed(responseId);
-
-                    stream.CopyFrom(messageStream);
-
-                    if(IsHost && clientId == NetworkingManager.Singleton.LocalClientId)
-                    {
-                        messageStream.Position = 0;
-                        object result = InvokeClientRPCLocal(hash, NetworkingManager.Singleton.LocalClientId, messageStream);
-
-                        return new RpcResponse<T>()
-                        {
-                            Id = responseId,
-                            IsDone = true,
-                            IsSuccessful = true,
-                            Result = result,
-                            Type = typeof(T),
-                            ClientId = clientId
-                        };
-                    }
-                    else
-                    {
-                        RpcResponse<T> response = new RpcResponse<T>()
-                        {
-                            Id = responseId,
-                            IsDone = false,
-                            IsSuccessful = false,
-                            Type = typeof(T),
-                            ClientId = clientId
-                        };
-
-                        ResponseMessageManager.Add(response.Id, response);
-
-                        InternalMessageSender.Send(clientId, MLAPIConstants.MLAPI_CLIENT_RPC_REQUEST, string.IsNullOrEmpty(channel) ? "MLAPI_DEFAULT_MESSAGE" : channel, stream, security, null);
-
-                        return response;
-                    }
-                }
-            }
-        }*/
-
+        #region Local
         public void InvokeLocalServerRPC(ulong hash, ulong senderClientID, Stream stream)
         {
             if(m_RPCReference == null) m_RPCReference = new RPCReference(this);
@@ -450,5 +220,7 @@ namespace Isaac.Network
 
             method.Invoke(m_RPCReference, senderClientID, stream);
         }
+
+        #endregion Local
     }
 }

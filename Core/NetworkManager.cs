@@ -151,12 +151,12 @@ namespace Isaac.Network
         public Action onShutdown;
 
         /// <summary>
-        /// The internal transport channel used for internal messages. The channel name is "NETWORK_CHANNEL". Unregistering this channel from the transport will cause errors.
+        /// The internal transport channel used for internal messages. The channel name is "NETWORK_CHANNEL". Unregistering this channel from the transport will cause errors. This channel is set to reliable.
         /// </summary>
         public byte networkInternalChannel { get; private set; } = NetworkTransport.INVALID_CHANNEL;
 
         /// <summary>
-        /// The transport channel that the Network Manager uses for syncronizing time. The channel name is "NETWORK_TIME_SYNC". Unregistering this channel from the transport will cause errors.
+        /// The transport channel that the Network Manager uses for syncronizing time. The channel name is "NETWORK_TIME_SYNC". Unregistering this channel from the transport will cause errors. This channel is set to unreliable.
         /// </summary>
         public byte timeSyncChannel { get; private set; } = NetworkTransport.INVALID_CHANNEL;
 

@@ -154,7 +154,16 @@ public class NetworkUISquare : NetworkBehaviour
     {
         lastSendRotation = transform.eulerAngles.z;
         if(isServer)
-            networkManager.onClientConnect += OnClientConnected;
+        {
+            if(clientID == networkManager.clientID)
+            {
+                networkManager.onClientConnect += OnClientConnected;
+            }
+            else
+            {
+                SetOwner(clientID);
+            }
+        }
     }
 
     protected override void OnNetworkShutdown()
@@ -165,14 +174,7 @@ public class NetworkUISquare : NetworkBehaviour
 
     private void OnClientConnected(ulong clientID)
     {
-        if(isNetworkReady)
-        {
-            SetOwner(clientID);
-        }
-        else
-        {
-            SpawnOnNetwork(clientID);
-        }
+        Debug.Log("Behaviour OnClientConnected called!");
     }
 
     protected override void OnGainedOwnership()

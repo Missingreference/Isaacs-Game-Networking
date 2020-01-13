@@ -24,6 +24,7 @@ namespace Isaac.Network.Spawning
         public byte objectSuccessMessageType { get; private set; } = (byte)MessageType.INVALID;
         public byte clientRPCMessageType { get; private set; } = (byte)MessageType.INVALID;
         public byte serverRPCMessageType { get; private set; } = (byte)MessageType.INVALID;
+        public byte ownerChangeMessageType { get; private set; } = (byte)MessageType.INVALID;
 
 
         public override Type[] dependencies => new Type[] { typeof(NetworkMessageHandler) };
@@ -32,6 +33,7 @@ namespace Isaac.Network.Spawning
         public delegate void ClientBehaviourConnectedDelegate(ulong networkID, ulong ownerID, bool ownerCanUnspawn, bool destroyOnUnspawn);
         public delegate void BehaviourDisconnectedDelegate(bool ownerCanUnspawn, bool destroyOnUnspawn);
         public delegate void NetworkBehaviourRPCDelegate(ulong hash, ulong senderClientID, Stream stream);
+        public delegate void OwnerChangeDelegate(ulong newOwner, bool ownerCanUnspawn);
 
         //Network Behaviours
         public readonly List<NetworkBehaviourReference> m_NetworkBehaviours = new List<NetworkBehaviourReference>();
@@ -70,6 +72,7 @@ namespace Isaac.Network.Spawning
                 objectSuccessMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_OBJECT_SUCCESS", HandleObjectSuccessMessage, NetworkMessageHandler.NetworkMessageReceiver.Server);
                 clientRPCMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_CLIENT_RPC", HandleClientRPCMessage, NetworkMessageHandler.NetworkMessageReceiver.Client);
                 serverRPCMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_SERVER_RPC", HandleServerRPCMessage, NetworkMessageHandler.NetworkMessageReceiver.Server);
+                ownerChangeMessageType = m_NetworkMessageHandler.RegisterMessageType("NETWORK_OWNER_CHANGE", HandleOwnerChangeMessage, NetworkMessageHandler.NetworkMessageReceiver.Both);
             }
             m_NetworkIDCounter = 0;
             m_NetworkBehaviours.Clear();
@@ -119,7 +122,7 @@ namespace Isaac.Network.Spawning
         }
 
         //Server only
-        public void SpawnOnNetworkServer(NetworkBehaviour behaviour, ServerBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectCallback, NetworkBehaviourRPCDelegate localRPCCallback, ulong owner, List<ulong> observers)
+        public void SpawnOnNetworkServer(NetworkBehaviour behaviour, ServerBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectCallback, NetworkBehaviourRPCDelegate localRPCCallback, OwnerChangeDelegate ownerChangeCallback, ulong owner, List<ulong> observers)
         {
             if(behaviour == null || !behaviour.isNetworkSpawned || behaviour.isNetworkReady)
             {
@@ -155,14 +158,14 @@ namespace Isaac.Network.Spawning
                 m_BehaviourByHashedID.Add(uniqueHash, behaviour);
             }
 
-            m_NetworkBehaviours.Add(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedServerCallback = connectedCallback, disconnectedDelegate = disconnectCallback, localRPCDelegate = localRPCCallback });
+            m_NetworkBehaviours.Add(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedServerCallback = connectedCallback, disconnectedDelegate = disconnectCallback, localRPCDelegate = localRPCCallback, ownerChangeDelegate = ownerChangeCallback });
             m_NetworkBehaviourDictionary.Add(newNetworkID, m_NetworkBehaviours[m_NetworkBehaviours.Count - 1]);
             
             connectedCallback.Invoke(newNetworkID, networkManager.serverID, observers);
         }
 
         //Client only
-        public void SpawnOnNetworkClient(NetworkBehaviour behaviour, ClientBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectedCallback, NetworkBehaviourRPCDelegate localRPCCallback)
+        public void SpawnOnNetworkClient(NetworkBehaviour behaviour, ClientBehaviourConnectedDelegate connectedCallback, BehaviourDisconnectedDelegate disconnectedCallback, NetworkBehaviourRPCDelegate localRPCCallback, OwnerChangeDelegate ownerChangeCallback)
         {
             if(behaviour == null || !behaviour.isNetworkSpawned || behaviour.isNetworkReady || m_LocalPendingBehavioursList.Contains(behaviour) || string.IsNullOrWhiteSpace(behaviour.uniqueID))
             {
@@ -172,7 +175,7 @@ namespace Isaac.Network.Spawning
             //Check if this is the Unique Behaviour being spawned in HandleAddObjectMessage where the Unique ID is blank and SpawnOnNetwork is called in Awake.
             if(m_TrackAwakeSpawns)
             {
-                m_BehavioursAwaitingSpawn.Enqueue(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback });
+                m_BehavioursAwaitingSpawn.Enqueue(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback, ownerChangeDelegate = ownerChangeCallback });
                 return;
             }
 
@@ -182,7 +185,7 @@ namespace Isaac.Network.Spawning
             {
                 m_RemotePendingBehavioursHashes.Remove(uniqueHash);
                 m_RemotePendingBehaviours.Remove(pendingBehaviour.networkID);
-                OnObjectConnectSuccess(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback }, pendingBehaviour.networkID, pendingBehaviour.ownerID, pendingBehaviour.ownerCanUnspawn, pendingBehaviour.destroyOnUnspawn);
+                OnObjectConnectSuccess(new NetworkBehaviourReference() { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback, ownerChangeDelegate = ownerChangeCallback }, pendingBehaviour.networkID, pendingBehaviour.ownerID, pendingBehaviour.ownerCanUnspawn, pendingBehaviour.destroyOnUnspawn);
             }
             else if(m_LocalPendingBehaviours.TryGetValue(uniqueHash, out pendingBehaviour))
             {
@@ -239,7 +242,7 @@ namespace Isaac.Network.Spawning
                 Debug.Log("Called7");
 
                 //Add to pending
-                pendingBehaviour = new PendingNetworkBehaviour() { isRemoteBehaviour = false, uniqueHash = uniqueHash, ownerID = networkManager.serverID, networkID = 0, reference = new NetworkBehaviourReference { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback } };
+                pendingBehaviour = new PendingNetworkBehaviour() { isRemoteBehaviour = false, uniqueHash = uniqueHash, ownerID = networkManager.serverID, networkID = 0, reference = new NetworkBehaviourReference { networkBehaviour = behaviour, connectedClientCallback = connectedCallback, disconnectedDelegate = disconnectedCallback, localRPCDelegate = localRPCCallback, ownerChangeDelegate = ownerChangeCallback } };
                 m_LocalPendingBehavioursList.Add(pendingBehaviour.reference.networkBehaviour);
                 m_LocalPendingBehaviours.Add(uniqueHash, pendingBehaviour);
                 m_HashedStrings.Add(uniqueHash, behaviour.uniqueID);
@@ -448,7 +451,7 @@ namespace Isaac.Network.Spawning
                         {
                             OnObjectConnectSuccess(reference, networkID, ownerID, ownerCanUnspawn, destroyOnUnspawn);
                         }
-                        SpawnOnNetworkClient(reference.networkBehaviour, reference.connectedClientCallback, reference.disconnectedDelegate, reference.localRPCDelegate);
+                        SpawnOnNetworkClient(reference.networkBehaviour, reference.connectedClientCallback, reference.disconnectedDelegate, reference.localRPCDelegate, reference.ownerChangeDelegate);
                     }
                 }
             }
@@ -502,44 +505,26 @@ namespace Isaac.Network.Spawning
         public void HandleClientRPCMessage(ulong clientID, Stream stream, float receiveTime)
         {
             Debug.Log("Received Client RPC Message");
-            if(networkManager.isServer)
-            {
-                if(networkManager.enableLogging)
-                {
-                    Debug.LogError("Received a Client RPC message from client '" + clientID + "' when they were not supposed to send that message type. Only the server should send Client RPC messages.");
-                }
-                return;
-            }
-
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
                 ulong networkID = reader.ReadUInt64Packed();
                 ulong methodHash = reader.ReadUInt64Packed();
 
-                if(!m_NetworkBehaviourDictionary.TryGetValue(networkID, out NetworkBehaviourReference behavoiurReference))
+                if(!m_NetworkBehaviourDictionary.TryGetValue(networkID, out NetworkBehaviourReference behaviourReference))
                 {
                     Debug.LogError("Received Client RPC message but the specified network ID '" + networkID + "' is not associated with a spawned and ready Network Behaviour.");
                     return;
                 }
 
-                if(BehaviourWasDestroyed(behavoiurReference.networkBehaviour)) return;
+                if(BehaviourWasDestroyed(behaviourReference.networkBehaviour)) return;
 
-                behavoiurReference.localRPCDelegate.Invoke(methodHash, clientID, stream);
+                behaviourReference.localRPCDelegate.Invoke(methodHash, clientID, stream);
             }
         }
 
         public void HandleServerRPCMessage(ulong clientID, Stream stream, float receiveTime)
         {
             Debug.Log("Received Server RPC Message");
-            if(!networkManager.isServer)
-            {
-                if(networkManager.enableLogging)
-                {
-                    Debug.LogError("Received a Server RPC message from client '" + clientID + "' when they were not supposed to send that message type. Only clients should send Server RPC messages.");
-                }
-                return;
-            }
-
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
                 ulong networkID = reader.ReadUInt64Packed();
@@ -555,6 +540,54 @@ namespace Isaac.Network.Spawning
 
                 //TODO Check if the client is even allowed to send this message. Such as non-owner can invoke or is even visible to the specific client.
                 behavoiurReference.localRPCDelegate.Invoke(hash, clientID, stream);
+            }
+        }
+
+        public void HandleOwnerChangeMessage(ulong clientID, Stream stream, float receiveTime)
+        {
+            Debug.Log("Received Onwer Change Message");
+            using(PooledBitReader reader = PooledBitReader.Get(stream))
+            {
+                ulong networkID = reader.ReadUInt64Packed();
+                ulong newOwner = reader.ReadUInt64Packed();
+                bool ownerCanUnspawn = reader.ReadBool();
+
+                if(networkManager.isServer)
+                {
+                    if(!m_NetworkBehaviourDictionary.TryGetValue(networkID, out NetworkBehaviourReference behaviourReference))
+                    {
+                        Debug.LogError("Received 'owner change' message type from '" + clientID + "' but there is no Network Behaviour associated with network ID: '" + networkID + "'.");
+                        return;
+                    }
+
+                    if(BehaviourWasDestroyed(behaviourReference.networkBehaviour)) return;
+
+                    if(behaviourReference.networkBehaviour.ownerID != clientID)
+                    {
+                        Debug.LogError("Received 'owner change' message type from '" + clientID + "' but they are not the owner of the Network Behaviour '" + behaviourReference.networkBehaviour + "' (Network ID: " + networkID + ").");
+                        return;
+                    }
+                    if(newOwner != networkManager.serverID)
+                    {
+                        Debug.LogError("Received 'owner change' message type from '" + clientID + "' but they were trying to set the owner to someone other than the server which clients should only be able to return ownership to the server.");
+                        return;
+                    }
+
+                    behaviourReference.ownerChangeDelegate.Invoke(newOwner, ownerCanUnspawn);
+
+
+                }
+                else
+                {
+                    if(!m_NetworkBehaviourDictionary.TryGetValue(networkID, out NetworkBehaviourReference behaviourReference))
+                    {
+                        Debug.LogError("Received 'owner change' message type from the server but there is no Network Behaviour associated with network ID: '" + networkID + "'.");
+                        return;
+                    }
+                    if(BehaviourWasDestroyed(behaviourReference.networkBehaviour)) return;
+
+                    behaviourReference.ownerChangeDelegate.Invoke(newOwner, ownerCanUnspawn);
+                }
             }
         }
 
@@ -659,6 +692,7 @@ namespace Isaac.Network.Spawning
             public ClientBehaviourConnectedDelegate connectedClientCallback;
             public BehaviourDisconnectedDelegate disconnectedDelegate;
             public NetworkBehaviourRPCDelegate localRPCDelegate;
+            public OwnerChangeDelegate ownerChangeDelegate;
         }
 
         private struct PendingNetworkBehaviour
