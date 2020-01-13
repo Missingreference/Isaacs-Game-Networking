@@ -93,7 +93,32 @@ public class SpawnTestUI : MonoBehaviour
                 m_LeftSpawnButton.GetComponentInChildren<TextMeshProUGUI>().text = "Unspawn On Network";
                 if(leftNetworkSquare.isNetworkReady)
                 {
-                    m_LeftStatusText.text = "Connected across network | Network ID: " + leftNetworkSquare.networkID;
+                    m_LeftStatusText.text = "Connected across network | Network ID: " + leftNetworkSquare.networkID + " \nOwner ID: " + leftNetworkSquare.ownerID;
+                    if(m_NetworkManager.isServer)
+                    {
+                        m_LeftStatusText.text += "\nObservers: ";
+                        using(HashSet<ulong>.Enumerator observers = leftNetworkSquare.GetObservers())
+                        {
+                            while(observers.MoveNext())
+                            {
+                                m_LeftStatusText.text += " [" + observers.Current + "],";
+                            }
+                            m_LeftStatusText.text = m_LeftStatusText.text.Substring(0, m_LeftStatusText.text.Length - 1);
+                        }
+
+                        if(leftNetworkSquare.GetPendingObservers().MoveNext())
+                        {
+                            m_LeftStatusText.text += "\nPending Observers: ";
+                            using(HashSet<ulong>.Enumerator observers = leftNetworkSquare.GetPendingObservers())
+                            {
+                                while(observers.MoveNext())
+                                {
+                                    m_LeftStatusText.text += " [" + observers.Current + "],";
+                                }
+                                m_LeftStatusText.text = m_LeftStatusText.text.Substring(0, m_LeftStatusText.text.Length - 1);
+                            }
+                        }
+                    }
                 }
                 else
                 {
