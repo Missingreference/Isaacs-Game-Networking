@@ -308,7 +308,8 @@ namespace Isaac.Network.Spawning
         //Called to handle any local managing of unspawning a behaviour
         private void DoLocalUnspawn(NetworkBehaviourReference behaviourReference, bool destroy)
         {
-            Debug.Log("Do Local Unspawn called");
+            if(networkManager.enableLogging)
+                Debug.Log("Do Local Unspawn called");
             m_NetworkBehaviours.Remove(behaviourReference);
             m_NetworkBehaviourDictionary.Remove(behaviourReference.networkBehaviour.networkID);
             if(!string.IsNullOrWhiteSpace(behaviourReference.networkBehaviour.uniqueID))
@@ -324,7 +325,8 @@ namespace Isaac.Network.Spawning
         //Client only
         private void DoLocalUnspawn(PendingNetworkBehaviour pendingBehaviour, bool destroy)
         {
-            Debug.Log("Do Local Unspawn Pending called");
+            if(networkManager.enableLogging)
+                Debug.Log("Do Local Unspawn Pending called");
             m_LocalPendingBehaviours.Remove(pendingBehaviour.uniqueHash.Value);
 
             if(pendingBehaviour.uniqueHash != null)
@@ -510,7 +512,8 @@ namespace Isaac.Network.Spawning
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
                 ulong networkID = reader.ReadUInt64Packed();
-                Debug.Log("Received object success with ID: " + networkID);
+                if(networkManager.enableLogging)
+                    Debug.Log("Received object success with ID: " + networkID);
                 if(m_NetworkBehaviourDictionary.TryGetValue(networkID, out NetworkBehaviourReference behaviourReference))
                 {
                     if(BehaviourWasDestroyed(behaviourReference.networkBehaviour)) return;
@@ -526,7 +529,8 @@ namespace Isaac.Network.Spawning
 
         public void HandleUnspawnMessage(ulong clientID, Stream stream, float receiveTime)
         {
-            Debug.Log("Received unspawn message");
+            if(networkManager.enableLogging)
+                Debug.Log("Received unspawn message");
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
                 ulong networkID = reader.ReadUInt64Packed();
@@ -553,7 +557,8 @@ namespace Isaac.Network.Spawning
 
         public void HandleClientRPCMessage(ulong clientID, Stream stream, float receiveTime)
         {
-            Debug.Log("Received Client RPC Message");
+            if(networkManager.enableLogging)
+                Debug.Log("Received Client RPC Message");
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
                 ulong networkID = reader.ReadUInt64Packed();
@@ -573,7 +578,8 @@ namespace Isaac.Network.Spawning
 
         public void HandleServerRPCMessage(ulong clientID, Stream stream, float receiveTime)
         {
-            Debug.Log("Received Server RPC Message");
+            if(networkManager.enableLogging)
+                Debug.Log("Received Server RPC Message");
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
                 ulong networkID = reader.ReadUInt64Packed();
@@ -594,7 +600,8 @@ namespace Isaac.Network.Spawning
 
         public void HandleOwnerChangeMessage(ulong clientID, Stream stream, float receiveTime)
         {
-            Debug.Log("Received Onwer Change Message");
+            if(networkManager.enableLogging)
+                Debug.Log("Received Onwer Change Message");
             using(PooledBitReader reader = PooledBitReader.Get(stream))
             {
                 ulong networkID = reader.ReadUInt64Packed();

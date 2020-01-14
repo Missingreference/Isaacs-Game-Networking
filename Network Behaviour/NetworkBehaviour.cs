@@ -476,7 +476,8 @@ namespace Isaac.Network
 
         private void OnBehaviourDisconnected(bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting)
         {
-            Debug.Log("Behaviour disconnected");
+            if(networkManager.enableLogging)
+                Debug.Log("Behaviour disconnected");
             if(networkManager.isRunning)
                 m_IsNetworkSpawned = false;
             m_IsNetworkReady = false;
