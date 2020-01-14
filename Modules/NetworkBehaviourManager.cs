@@ -29,7 +29,7 @@ namespace Isaac.Network.Spawning
 
         public override Type[] dependencies => new Type[] { typeof(NetworkMessageHandler) };
 
-        public delegate void ServerBehaviourConnectedDelegate(ulong networkID, ulong clientID, List<ulong> observers, Stream spawnPayload);
+        public delegate void ServerBehaviourConnectedDelegate(ulong networkID, ulong ownerID, ulong clientID, List<ulong> observers, Stream spawnPayload);
         public delegate void ClientBehaviourConnectedDelegate(ulong networkID, ulong ownerID, bool ownerCanUnspawn, bool destroyOnUnspawn, Stream spawnPayload);
         public delegate void BehaviourDisconnectedDelegate(bool ownerCanUnspawn, bool destroyOnUnspawn);
         public delegate void NetworkBehaviourRPCDelegate(ulong hash, ulong senderClientID, Stream stream);
@@ -164,7 +164,7 @@ namespace Isaac.Network.Spawning
             //Spawn payload
             if(spawnPayload == null)
             {
-                connectedCallback.Invoke(newNetworkID, networkManager.serverID, observers, null);
+                connectedCallback.Invoke(newNetworkID, owner, networkManager.serverID, observers, null);
             }
             else
             {
@@ -172,14 +172,9 @@ namespace Isaac.Network.Spawning
                 {
                     payloadStream.CopyFrom(spawnPayload);
                     payloadStream.Position = 0;
-                    connectedCallback.Invoke(newNetworkID, networkManager.serverID, observers, payloadStream);
+                    connectedCallback.Invoke(newNetworkID, owner, networkManager.serverID, observers, payloadStream);
                 }
             }
-
-            //Update ownership
-            if(behaviour.ownerID != owner)
-                behaviour.SetOwner(owner);
-
         }
 
         //Client only
@@ -520,7 +515,7 @@ namespace Isaac.Network.Spawning
                 {
                     if(BehaviourWasDestroyed(behaviourReference.networkBehaviour)) return;
 
-                    behaviourReference.connectedServerCallback.Invoke(networkID, clientID, null, null);
+                    behaviourReference.connectedServerCallback.Invoke(networkID, behaviourReference.networkBehaviour.ownerID, clientID, null, null);
                 }
                 else
                 {

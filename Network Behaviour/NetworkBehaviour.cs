@@ -405,7 +405,7 @@ namespace Isaac.Network
         protected virtual void OnNetworkShutdown() { }
 
         //Server
-        private void OnBehaviourConnected(ulong newNetworkID, ulong clientID, List<ulong> observers, Stream stream)
+        private void OnBehaviourConnected(ulong newNetworkID, ulong ownerID, ulong clientID, List<ulong> observers, Stream stream)
         {
             m_NetworkID = newNetworkID;
 
@@ -418,6 +418,8 @@ namespace Isaac.Network
 
                 //Add server as observer
                 m_Observers.Add(clientID);
+
+                OnOwnerChanged(ownerID, ownerCanUnspawn);
 
                 if(observers == null)
                     NetworkShowAll(stream);

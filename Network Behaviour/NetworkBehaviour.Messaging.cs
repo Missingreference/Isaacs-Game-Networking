@@ -20,10 +20,10 @@ namespace Isaac.Network
 
         public void InvokeServerRPC(RPCDelegate method, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
-            if(isServer && !isClient)
+            if(!isClient)
             {
                 //We are only a server and not a client
-                Debug.LogError("Tried to invoke a ServerRPC as only a server and not a host. Only a client can invoke a server RPC.");
+                Debug.LogError("Tried to invoke a ServerRPC without being a client. Only a client can invoke a server RPC.");
                 return;
             }
 
@@ -60,10 +60,10 @@ namespace Isaac.Network
 
         public void InvokeClientRPC(RPCDelegate method, ulong clientID, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
-            if(!isServer && isClient)
+            if(!isServer)
             {
                 //We are only a client
-                Debug.LogError("Tried to invoke a ClientRPC as only a client. Only the server can invoke a client RPC.");
+                Debug.LogError("Tried to invoke a ClientRPC without being the server. Only the server can invoke a client RPC.");
                 return;
             }
 
@@ -110,10 +110,10 @@ namespace Isaac.Network
         //Does not invoke on all clients but rather invokes on ALL (not pending)observers.
         public void InvokeClientRPCAll(RPCDelegate method, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
-            if(!isServer && isClient)
+            if(!isServer)
             {
                 //We are only a client
-                Debug.LogError("Tried to invoke a ClientRPC as only a client. Only the server can invoke a client RPC.");
+                Debug.LogError("Tried to invoke a ClientRPC without being the server. Only the server can invoke a client RPC.");
                 return;
             }
 
@@ -152,10 +152,10 @@ namespace Isaac.Network
 
         public void InvokeClientRPCAllExcept(RPCDelegate method, ulong clientIDToIgnore, Stream messageStream, byte channel = NetworkTransport.DEFAULT_CHANNEL)
         {
-            if(!isServer && isClient)
+            if(!isServer)
             {
                 //We are only a client
-                Debug.LogError("Tried to invoke a ClientRPC as only a client. Only the server can invoke a client RPC.");
+                Debug.LogError("Tried to invoke a ClientRPC without being the server. Only the server can invoke a client RPC.");
                 return;
             }
 
