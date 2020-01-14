@@ -6,6 +6,7 @@ using TMPro;
 
 using Isaac.Network;
 using Isaac.Network.Exceptions;
+using MLAPI.Serialization.Pooled;
 
 public class SpawnTestUI : MonoBehaviour
 {
@@ -136,7 +137,7 @@ public class SpawnTestUI : MonoBehaviour
             }
 
             //Update position and size
-            leftNetworkSquare.transform.localPosition = m_LeftObjectPositioner.rect.center;
+            //leftNetworkSquare.transform.localPosition = m_LeftObjectPositioner.rect.center;
             float targetSize = Mathf.Min(m_LeftObjectPositioner.rect.width, m_LeftObjectPositioner.rect.height);
             //Pad
             targetSize = 0.8f * targetSize;
@@ -160,7 +161,7 @@ public class SpawnTestUI : MonoBehaviour
         leftNetworkSquare = new GameObject("Network Square With Unique ID").AddComponent<NetworkUISquare>();
         leftNetworkSquare.uniqueID = uniqueID;
         leftNetworkSquare.transform.SetParent(m_LeftObjectPositioner);
-        leftNetworkSquare.transform.localPosition = m_LeftObjectPositioner.rect.center;
+        //leftNetworkSquare.transform.localPosition = m_LeftObjectPositioner.rect.center;
 
         leftNetworkSquare.spawnOnNetworkInit = m_LeftSpawnInitToggle.isOn;
 
@@ -195,7 +196,22 @@ public class SpawnTestUI : MonoBehaviour
         }
         else
         {
-            leftNetworkSquare.SpawnOnNetwork();
+            if(m_NetworkManager.isServer)
+            {
+                using(PooledBitStream stream = PooledBitStream.Get())
+                {
+                    using(PooledBitWriter writer = PooledBitWriter.Get(stream))
+                    {
+                        writer.WriteSinglePacked(m_LeftObjectPositioner.rect.center.x);
+                        writer.WriteSinglePacked(m_LeftObjectPositioner.rect.center.y);
+                    }
+                    leftNetworkSquare.SpawnOnNetwork(stream);
+                }
+            }
+            else
+            {
+                leftNetworkSquare.SpawnOnNetwork();
+            }
         }
     }
 

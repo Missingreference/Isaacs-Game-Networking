@@ -237,11 +237,11 @@ namespace Isaac.Network
         /// When this is called it will begin its connection to its matching Network Behaviour across the network. Until this function is called it will act as a normal Monobehaviour.
         /// Default owner is the server. Default visibility is all clients.
         /// </summary>
-        public void SpawnOnNetwork(Stream stream = null)
+        public void SpawnOnNetwork(Stream spawnPayload = null)
         {
             if(!IsValidSpawn()) return;
 
-            DoSpawnOnNetwork(networkManager.serverID, null, null);
+            DoSpawnOnNetwork(networkManager.serverID, null, spawnPayload);
         }
 
         /// <summary>
@@ -249,11 +249,11 @@ namespace Isaac.Network
         /// This variant of the function should only be called by the server since only the server can spawn a Network Behaviour with ownership.
         /// </summary>
         /// <param name="ownerID">The client ID of the </param>
-        public void SpawnOnNetwork(ulong ownerID, Stream stream = null)
+        public void SpawnOnNetwork(ulong ownerID, Stream spawnPayload = null)
         {
             if(!IsValidSpawn()) return;
 
-            DoSpawnOnNetwork(ownerID, null, null);
+            DoSpawnOnNetwork(ownerID, null, spawnPayload);
         }
 
         /// <summary>
@@ -262,11 +262,11 @@ namespace Isaac.Network
         /// </summary>
         /// <param name="ownerID">The client ID of the target client that will be the owner of this Network Behaviour.</param>
         /// <param name="observers">The list of clients that will have visibility of this Network Behaviour.</param>
-        public void SpawnOnNetwork(ulong ownerID, List<ulong> observers, Stream stream = null)
+        public void SpawnOnNetwork(ulong ownerID, List<ulong> observers, Stream spawnPayload = null)
         {
             if(!IsValidSpawn()) return;
 
-            DoSpawnOnNetwork(ownerID, observers, null);
+            DoSpawnOnNetwork(ownerID, observers, spawnPayload);
         }
 
         private bool IsValidSpawn()
@@ -299,24 +299,24 @@ namespace Isaac.Network
             return true;
         }
 
-        private void DoSpawnOnNetwork(ulong ownerID, List<ulong> observers, Stream stream)
+        private void DoSpawnOnNetwork(ulong ownerID, List<ulong> observers, Stream spawnPayload)
         {
 #if UNITY_EDITOR
             m_KnownUniqueID = m_UniqueID;
 #endif
-
-            if(stream != null)
-                Debug.LogWarning("Stream parameter is not yet implemented.");
-
             if(!string.IsNullOrWhiteSpace(uniqueID))
                 m_UniqueHash = uniqueID.GetStableHash(networkManager.config.rpcHashSize);
 
+
             if(isServer) //Server
             {
+                if(spawnPayload != null)
+                    spawnPayload.Position = 0;
+
                 try
                 {
                     m_IsNetworkSpawned = true;
-                    m_NetworkBehaviourManager.SpawnOnNetworkServer(this, OnBehaviourConnected, OnBehaviourDisconnected, OnServerRPCReceived, OnOwnerChanged, ownerID, observers);
+                    m_NetworkBehaviourManager.SpawnOnNetworkServer(this, OnBehaviourConnected, OnBehaviourDisconnected, OnServerRPCReceived, OnOwnerChanged, ownerID, observers, spawnPayload);
                 }
                 catch(Exception ex)
                 {
@@ -344,6 +344,9 @@ namespace Isaac.Network
                 {
                     throw new NotServerException("Only the server can change the visibility of this Network Behaviour when spawning on the network.");
                 }
+
+                if(spawnPayload != null)
+                    Debug.LogWarning("Spawn payloads by clients are not supported. The payload will not be sent.");
 
                 try
                 {
@@ -394,7 +397,7 @@ namespace Isaac.Network
         /// <param name="clientID">
         /// The client/server that successfully connected behaviours across the network. Clients will only received the server's ID as the value.
         /// </param>
-        protected virtual void OnNetworkReady(ulong clientID) { }
+        protected virtual void OnNetworkReady(ulong clientID, Stream spawnPayload) { }
 
         /// <summary>
         /// Called when this Network Behaviour disconnects.
@@ -402,7 +405,7 @@ namespace Isaac.Network
         protected virtual void OnNetworkShutdown() { }
 
         //Server
-        private void OnBehaviourConnected(ulong newNetworkID, ulong clientID, List<ulong> observers)
+        private void OnBehaviourConnected(ulong newNetworkID, ulong clientID, List<ulong> observers, Stream stream)
         {
             m_NetworkID = newNetworkID;
 
@@ -417,9 +420,9 @@ namespace Isaac.Network
                 m_Observers.Add(clientID);
 
                 if(observers == null)
-                    NetworkShowAll();
+                    NetworkShowAll(stream);
                 else
-                    NetworkShow(observers);
+                    NetworkShow(observers, stream);
             }
             else
             {
@@ -443,11 +446,11 @@ namespace Isaac.Network
             }
 
             //Call Network start function
-            OnNetworkReady(clientID);
+            OnNetworkReady(clientID, stream);
         }
 
         //Client
-        private void OnBehaviourConnected(ulong newNetworkID, ulong ownerID, bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting)
+        private void OnBehaviourConnected(ulong newNetworkID, ulong ownerID, bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting, Stream stream)
         {
             m_NetworkID = newNetworkID;
 
@@ -466,14 +469,8 @@ namespace Isaac.Network
             m_DestroyOnUnspawn = destroyOnUnspawnSetting;
 
             //Call Network start function
-            OnNetworkReady(networkManager.serverID);
+            OnNetworkReady(networkManager.serverID, stream);
         }
-
-        private void OnBehaviourUpdate(bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting, ulong ownerID, bool isLostObserver, ulong observer)
-        {
-
-        }
-
 
         private void OnBehaviourDisconnected(bool ownerCanUnspawnSetting, bool destroyOnUnspawnSetting)
         {

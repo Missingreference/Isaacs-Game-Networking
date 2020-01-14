@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System.IO;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Isaac.Network;
@@ -23,7 +24,7 @@ public class RotatingNetworkObject : NetworkBehaviour
         transform.localScale = new Vector3(1.35f, 1.0f, 1.0f);
     }
 
-    protected override void OnNetworkReady(ulong clientID)
+    protected override void OnNetworkReady(ulong clientID, Stream spawnPayload)
     {
         Debug.Log("On Network Start called");
     }

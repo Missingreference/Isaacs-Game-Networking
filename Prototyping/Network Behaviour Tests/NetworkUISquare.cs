@@ -44,7 +44,7 @@ public class NetworkUISquare : NetworkBehaviour
 
     void OnDestroy()
     {
-        Debug.Log("Destroyed!!");
+
     }
 
     void Update()
@@ -68,7 +68,7 @@ public class NetworkUISquare : NetworkBehaviour
                     writer.WriteSinglePacked(transform.localEulerAngles.z);
 
                 if(isServer)
-                    InvokeClientRPCAllExcept(ApplyRotation, ownerID, stream, "Rotate Channel"); //Debug.LogWarning("Not implemented");//InvokeClientRpcOnEveryoneExceptPerformance(ApplyTransform, OwnerClientId, stream, string.IsNullOrEmpty(Channel) ? "MLAPI_DEFAULT_MESSAGE" : Channel);
+                    InvokeClientRPCAllExcept(ApplyRotation, ownerID, stream, "Rotate Channel");
                 else
                     InvokeServerRPC(SetRotation, stream, "Rotate Channel");
             }
@@ -82,59 +82,14 @@ public class NetworkUISquare : NetworkBehaviour
         {
             float rotation = reader.ReadSinglePacked();
 
-            /* This is where we verify movement
-            if(IsMoveValidDelegate != null && !IsMoveValidDelegate(lerpEndPos, new Vector3(xPos, yPos, zPos)))
-            {
-                //Invalid move!
-                //TODO: Add rubber band (just a message telling them to go back)
-                return;
-            }*/
+            //This is where we verify movement
 
             using(PooledBitStream writeStream = PooledBitStream.Get())
             {
                 using(PooledBitWriter writer = PooledBitWriter.Get(writeStream))
                 {
                     writer.WriteSinglePacked(rotation);
-                    /*
-                    if(EnableRange)
-                    {
-                        for(int i = 0; i < NetworkingManager.Singleton.ConnectedClientsList.Count; i++)
-                        {
-                            if(!clientSendInfo.ContainsKey(NetworkingManager.Singleton.ConnectedClientsList[i].ClientId))
-                            {
-                                clientSendInfo.Add(NetworkingManager.Singleton.ConnectedClientsList[i].ClientId, new ClientSendInfo()
-                                {
-                                    clientId = NetworkingManager.Singleton.ConnectedClientsList[i].ClientId,
-                                    lastMissedPosition = null,
-                                    lastMissedRotation = null,
-                                    lastSent = 0
-                                });
-                            }
-
-                            ClientSendInfo info = clientSendInfo[NetworkingManager.Singleton.ConnectedClientsList[i].ClientId];
-                            Vector3? receiverPosition = NetworkingManager.Singleton.ConnectedClientsList[i].PlayerObject == null ? null : new Vector3?(NetworkingManager.Singleton.ConnectedClientsList[i].PlayerObject.transform.position);
-                            Vector3? senderPosition = NetworkingManager.Singleton.ConnectedClients[OwnerClientId].PlayerObject == null ? null : new Vector3?(NetworkingManager.Singleton.ConnectedClients[OwnerClientId].PlayerObject.transform.position);
-
-                            if((receiverPosition == null || senderPosition == null && NetworkingManager.Singleton.NetworkTime - info.lastSent >= (1f / FixedSendsPerSecond)) || NetworkingManager.Singleton.NetworkTime - info.lastSent >= GetTimeForLerp(receiverPosition.Value, senderPosition.Value))
-                            {
-                                info.lastSent = NetworkingManager.Singleton.NetworkTime;
-                                info.lastMissedPosition = null;
-                                info.lastMissedRotation = null;
-
-                                InvokeClientRpcOnClientPerformance(ApplyTransform, NetworkingManager.Singleton.ConnectedClientsList[i].ClientId, writeStream, string.IsNullOrEmpty(Channel) ? "MLAPI_DEFAULT_MESSAGE" : Channel);
-                            }
-                            else
-                            {
-                                info.lastMissedPosition = new Vector3(xPos, yPos, zPos);
-                                info.lastMissedRotation = Quaternion.Euler(xRot, yRot, zRot);
-                            }
-                        }
-                    }
-                    else*/
-                    {
-                        InvokeClientRPCAllExcept(ApplyRotation, ownerID, writeStream, "Rotate Channel");
-                        //InvokeClientRpcOnEveryoneExceptPerformance(ApplyTransform, OwnerClientId, writeStream, string.IsNullOrEmpty(Channel) ? "MLAPI_DEFAULT_MESSAGE" : Channel);
-                    }
+                    InvokeClientRPCAllExcept(ApplyRotation, ownerID, writeStream, "Rotate Channel");
                 }
             }
         }
@@ -150,7 +105,7 @@ public class NetworkUISquare : NetworkBehaviour
         }
     }
 
-    protected override void OnNetworkReady(ulong clientID)
+    protected override void OnNetworkReady(ulong clientID, Stream spawnPayload)
     {
         lastSendRotation = transform.eulerAngles.z;
         if(isServer)
@@ -163,6 +118,17 @@ public class NetworkUISquare : NetworkBehaviour
             {
                 SetOwner(clientID);
             }
+        }
+        if(spawnPayload != null)
+        {
+            using(PooledBitReader reader = PooledBitReader.Get(spawnPayload))
+            {
+                transform.localPosition = new Vector3(reader.ReadSinglePacked(), reader.ReadSinglePacked(), 0.0f);
+            }
+        }
+        else
+        {
+            Debug.Log("Received null payload for Network UI Square.");
         }
     }
 

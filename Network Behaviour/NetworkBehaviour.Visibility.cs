@@ -86,7 +86,7 @@ namespace Isaac.Network
         /// Server only.
         /// </summary>
         /// <param name="clientID">The client to show the object to.</param>
-        public void NetworkShow(ulong clientID)
+        public void NetworkShow(ulong clientID, Stream spawnPayload=null)
         {
             if(m_PendingObservers.Contains(clientID))
             {
@@ -104,16 +104,17 @@ namespace Isaac.Network
             // Send spawn call
             using(PooledBitStream stream = PooledBitStream.Get())
             {
-                DoVisibleShowWrite(stream);
+                DoVisibleShowWrite(stream, spawnPayload);
                 MessageSender.Send(clientID, networkBehaviourManager.spawnMessageType, stream);
             }
         }
 
         /// <summary>
         /// Does not supress errors invloving clients that already have visibility of this Network Behaviour.
+        /// Server only.
         /// </summary>
         /// <param name="clientIDs"></param>
-        public void NetworkShow(List<ulong> clientIDs)
+        public void NetworkShow(List<ulong> clientIDs, Stream spawnPayload=null)
         {
             //A faster message send bypassing MessageSender completely
 
@@ -124,7 +125,7 @@ namespace Isaac.Network
 
             using(PooledBitStream baseStream = PooledBitStream.Get())
             {
-                DoVisibleShowWrite(baseStream);
+                DoVisibleShowWrite(baseStream, spawnPayload);
                 baseStream.PadStream();
                 if(clientIDs.Count == 0) return; //No one to send to.
                 using(BitStream stream = MessagePacker.WrapMessage(networkBehaviourManager.spawnMessageType, 0, baseStream, SecuritySendFlags.None))
@@ -153,14 +154,15 @@ namespace Isaac.Network
 
         /// <summary>
         /// Suppresses errors involving clients that already have visibility of this Network Behaviour.
+        /// Server only.
         /// </summary>
-        public void NetworkShowAll()
+        public void NetworkShowAll(Stream spawnPayload=null)
         {
             //A faster message send bypassing MessageSender completely
 
             using(PooledBitStream baseStream = PooledBitStream.Get())
             {
-                DoVisibleShowWrite(baseStream);
+                DoVisibleShowWrite(baseStream, spawnPayload);
                 baseStream.PadStream();
 
                 using(BitStream stream = MessagePacker.WrapMessage(networkBehaviourManager.spawnMessageType, 0, baseStream, SecuritySendFlags.None))
@@ -183,7 +185,7 @@ namespace Isaac.Network
             }
         }
 
-        private void DoVisibleShowWrite(PooledBitStream stream)
+        private void DoVisibleShowWrite(PooledBitStream stream, Stream spawnPayload)
         {
             if(!isServer)
             {
@@ -214,16 +216,26 @@ namespace Isaac.Network
                 writer.WriteBool(ownerCanUnspawn);
                 writer.WriteBool(destroyOnUnspawn);
 
+                //Write payload
+                writer.WriteBool(spawnPayload != null);
+
+                if(spawnPayload != null)
+                {
+                    spawnPayload.Position = 0;
+                    writer.WriteInt32Packed((int)spawnPayload.Length);
+                    stream.CopyFrom(spawnPayload);
+                }
+
                 if(networkManager.enableLogging)
                     Debug.Log("Sending to clients the new behaviour " + GetType());
             }
         }
 
         /// <summary>
-        /// Hides a object from a specific client.
+        /// Hides an object from a specific client.
         /// Server only.
         /// </summary>
-        /// <param name="clientID">The client to hide the object for</param>
+        /// <param name="clientID">The client to hide the object from.</param>
         public void NetworkHide(ulong clientID)
         {
 
@@ -254,6 +266,11 @@ namespace Isaac.Network
             }
         }
 
+        /// <summary>
+        /// Hides an object from a specific clients.
+        /// Server only.
+        /// </summary>
+        /// <param name="clientIDs">The clients to hide the object from.</param>
         public void NetworkHide(List<ulong> clientIDs)
         {
             //A faster message send bypassing MessageSender completely
@@ -286,6 +303,10 @@ namespace Isaac.Network
             }
         }
 
+        /// <summary>
+        /// Hides an object from all clients.
+        /// Server only.
+        /// </summary>
         public void NetworkHideAll()
         {
             //A faster message send bypassing MessageSender completely

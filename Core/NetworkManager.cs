@@ -688,7 +688,6 @@ namespace Isaac.Network
 
         private void Shutdown()
         {
-            Debug.Log("Shutdown called");
             if(enableLogging)
                 Debug.Log("Shutdown called");
 
