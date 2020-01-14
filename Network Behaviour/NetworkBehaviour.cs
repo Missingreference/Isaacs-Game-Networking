@@ -137,7 +137,7 @@ namespace Isaac.Network
             }
             set
             {
-                if(!isOwner)
+                if(networkManager.isRunning && !isServer && !isOwner)
                 {
                     throw new NotServerException("Only the server or owner can set destroyOnUnspawn property.");
                 }
