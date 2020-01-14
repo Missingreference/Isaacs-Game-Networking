@@ -176,6 +176,10 @@ namespace Isaac.Network.Spawning
                 }
             }
 
+            //Update ownership
+            if(behaviour.ownerID != owner)
+                behaviour.SetOwner(owner);
+
         }
 
         //Client only

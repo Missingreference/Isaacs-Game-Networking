@@ -241,7 +241,7 @@ namespace Isaac.Network
         {
             if(!IsValidSpawn()) return;
 
-            DoSpawnOnNetwork(networkManager.serverID, null, spawnPayload);
+            DoSpawnOnNetwork(ownerID, null, spawnPayload);
         }
 
         /// <summary>
