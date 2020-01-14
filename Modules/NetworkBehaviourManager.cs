@@ -36,9 +36,9 @@ namespace Isaac.Network.Spawning
         public delegate void OwnerChangeDelegate(ulong newOwner, bool ownerCanUnspawn);
 
         //Network Behaviours
-        public readonly List<NetworkBehaviourReference> m_NetworkBehaviours = new List<NetworkBehaviourReference>();
+        private readonly List<NetworkBehaviourReference> m_NetworkBehaviours = new List<NetworkBehaviourReference>();
         //ulong key = networkID
-        public readonly Dictionary<ulong, NetworkBehaviourReference> m_NetworkBehaviourDictionary = new Dictionary<ulong, NetworkBehaviourReference>();
+        private readonly Dictionary<ulong, NetworkBehaviourReference> m_NetworkBehaviourDictionary = new Dictionary<ulong, NetworkBehaviourReference>();
 
         //Network ID Management
         private ulong m_NetworkIDCounter = 0;
@@ -466,19 +466,41 @@ namespace Isaac.Network.Spawning
                     NetworkBehaviour serverBehaviour = (NetworkBehaviour)behaviourObject.AddComponent(behaviourType);
                     
                     m_TrackAwakeSpawns = false;
-
-                    while(m_BehavioursAwaitingSpawn.Count > 0)
+                    if(m_BehavioursAwaitingSpawn.Count > 0)
                     {
-                        NetworkBehaviourReference reference = m_BehavioursAwaitingSpawn.Dequeue();
-                        if(reference.networkBehaviour == serverBehaviour)
+                        while(m_BehavioursAwaitingSpawn.Count > 0)
                         {
-                            OnObjectConnectSuccess(reference, networkID, ownerID, ownerCanUnspawn, destroyOnUnspawn, payloadStream);
-                            if(payloadStream != null)
+                            NetworkBehaviourReference reference = m_BehavioursAwaitingSpawn.Dequeue();
+                            if(reference.networkBehaviour == serverBehaviour)
                             {
-                                payloadStream.Dispose();
+                                OnObjectConnectSuccess(reference, networkID, ownerID, ownerCanUnspawn, destroyOnUnspawn, payloadStream);
+                                if(payloadStream != null)
+                                {
+                                    payloadStream.Dispose();
+                                }
+                            }
+                            else
+                            {
+                                SpawnOnNetworkClient(reference.networkBehaviour, reference.connectedClientCallback, reference.disconnectedDelegate, reference.localRPCDelegate, reference.ownerChangeDelegate);
                             }
                         }
-                        SpawnOnNetworkClient(reference.networkBehaviour, reference.connectedClientCallback, reference.disconnectedDelegate, reference.localRPCDelegate, reference.ownerChangeDelegate);
+                    }
+                    if(!serverBehaviour.isNetworkSpawned)
+                    {
+                        serverBehaviour.uniqueID = "NETWORK_SERVER_BEHAVIOUR_" + networkID.ToString();
+                        serverBehaviour.SpawnOnNetwork();
+                        ulong hash = serverBehaviour.uniqueID.GetStableHash(networkManager.config.rpcHashSize);
+
+                        PendingNetworkBehaviour pendingBehaviour = m_LocalPendingBehaviours[hash];
+                        //Clean up pending
+                        m_LocalPendingBehaviours.Remove(uniqueHash);
+                        m_LocalPendingBehavioursList.Remove(serverBehaviour);
+
+                        OnObjectConnectSuccess(pendingBehaviour.reference, networkID, ownerID, ownerCanUnspawn, destroyOnUnspawn, payloadStream);
+                        if(payloadStream != null)
+                        {
+                            payloadStream.Dispose();
+                        }
                     }
                 }
             }
@@ -636,7 +658,7 @@ namespace Isaac.Network.Spawning
                 using(PooledBitWriter writer = PooledBitWriter.Get(stream))
                 {
                     writer.WriteUInt64Packed(networkID);
-                    //if(networkManager.enableLogging)
+                    if(networkManager.enableLogging)
                         Debug.Log("Sending success of add object with Network ID: " + networkID);
                 }
             
