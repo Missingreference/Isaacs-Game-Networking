@@ -23,7 +23,7 @@ namespace Isaac.Network
             if(!isClient)
             {
                 //We are only a server and not a client
-                Debug.LogError("Tried to invoke a ServerRPC without being a client. Only a client can invoke a server RPC.");
+                Debug.LogError("Tried to invoke a ServerRPC without being a client. Only a client can invoke a server RPC.", this);
                 return;
             }
 
@@ -63,7 +63,7 @@ namespace Isaac.Network
             if(!isServer)
             {
                 //We are only a client
-                Debug.LogError("Tried to invoke a ClientRPC without being the server. Only the server can invoke a client RPC.");
+                Debug.LogError("Tried to invoke a ClientRPC without being the server. Only the server can invoke a client RPC.", this);
                 return;
             }
 
@@ -113,7 +113,7 @@ namespace Isaac.Network
             if(!isServer)
             {
                 //We are only a client
-                Debug.LogError("Tried to invoke a ClientRPC without being the server. Only the server can invoke a client RPC.");
+                Debug.LogError("Tried to invoke a ClientRPC without being the server. Only the server can invoke a client RPC.", this);
                 return;
             }
 
@@ -155,7 +155,7 @@ namespace Isaac.Network
             if(!isServer)
             {
                 //We are only a client
-                Debug.LogError("Tried to invoke a ClientRPC without being the server. Only the server can invoke a client RPC.");
+                Debug.LogError("Tried to invoke a ClientRPC without being the server. Only the server can invoke a client RPC.", this);
                 return;
             }
 
