@@ -13,10 +13,10 @@ using BitStream = MLAPI.Serialization.BitStream;
 using MLAPI.Spawning;
 using MLAPI.Messaging;
 
-using Isaac.Network.Connection;
-using Isaac.Network.Spawning;
+using Elanetic.Network.Connection;
+using Elanetic.Network.Spawning;
 
-namespace Isaac.Network.Messaging
+namespace Elanetic.Network.Messaging
 {
     public class NetworkMessageHandler : NetworkModule
     {

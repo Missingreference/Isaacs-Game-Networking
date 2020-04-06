@@ -10,10 +10,10 @@ using MLAPI.Serialization.Pooled;
 using MLAPI.Messaging;
 using MLAPI.Hashing;
 
-using Isaac.Network;
-using Isaac.Network.Messaging;
+using Elanetic.Network;
+using Elanetic.Network.Messaging;
 
-namespace Isaac.Network.SceneManagement
+namespace Elanetic.Network.SceneManagement
 {
     public class NetworkSceneManager : NetworkModule
     {

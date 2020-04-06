@@ -1,8 +1,8 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Isaac.Network;
-using Isaac.Network.SceneManagement;
+using Elanetic.Network;
+using Elanetic.Network.SceneManagement;
 using UnityEngine.SceneManagement;
 
 public class NetworkSceneTester : MonoBehaviour

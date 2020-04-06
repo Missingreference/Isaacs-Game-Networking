@@ -5,9 +5,9 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-using Isaac.Network.Transports;
-using Isaac.Network;
-using Isaac.Network.Development;
+using Elanetic.Network.Transports;
+using Elanetic.Network;
+using Elanetic.Network.Development;
 
 public class NetworkManagerWindow : MonoBehaviour
 {

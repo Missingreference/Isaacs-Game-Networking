@@ -9,10 +9,10 @@ using MLAPI.Security;
 using MLAPI.Serialization.Pooled;
 using BitStream = MLAPI.Serialization.BitStream;
 
-using Isaac.Network.Exceptions;
-using Isaac.Network.Messaging;
+using Elanetic.Network.Exceptions;
+using Elanetic.Network.Messaging;
 
-namespace Isaac.Network
+namespace Elanetic.Network
 {
     public abstract partial class NetworkBehaviour : MonoBehaviour
     {

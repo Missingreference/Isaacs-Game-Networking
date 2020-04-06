@@ -9,7 +9,7 @@ using System.Diagnostics;
 using System.IO;
 using MLAPI.Reflection;
 using UnityEngine;
-using Isaac.Network;
+using Elanetic.Network;
 using Debug = UnityEngine.Debug;
 
 namespace MLAPI.Serialization

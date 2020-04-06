@@ -4,8 +4,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-using Isaac.Network;
-using Isaac.Network.Exceptions;
+using Elanetic.Network;
+using Elanetic.Network.Exceptions;
 using MLAPI.Serialization.Pooled;
 
 public class SpawnTestUI : MonoBehaviour

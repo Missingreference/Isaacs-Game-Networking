@@ -9,7 +9,7 @@ using System.IO;
 using System.Text;
 using MLAPI.Reflection;
 using UnityEngine;
-using Isaac.Network;
+using Elanetic.Network;
 
 namespace MLAPI.Serialization
 {

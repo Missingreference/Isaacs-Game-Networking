@@ -10,9 +10,9 @@ using MLAPI.Serialization.Pooled;
 using BitStream = MLAPI.Serialization.BitStream;
 using MLAPI.Hashing;
 
-using Isaac.Network.Messaging;
+using Elanetic.Network.Messaging;
 
-namespace Isaac.Network
+namespace Elanetic.Network
 {
 	public class NetworkConfig
     {

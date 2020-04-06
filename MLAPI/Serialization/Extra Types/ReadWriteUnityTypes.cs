@@ -6,7 +6,7 @@ using UnityEngine.Experimental.Rendering;
 using Unity.Collections;
 using MLAPI.Serialization;
 
-namespace Isaac.Network.Serialization
+namespace Elanetic.Network.Serialization
 {
     public static class ReadWriteUnityTypes
     {

@@ -11,10 +11,10 @@ using MLAPI.Serialization.Pooled;
 using MLAPI.Hashing;
 using MLAPI.Messaging;
 
-using Isaac.Network.Messaging;
-using Isaac.Network.Exceptions;
+using Elanetic.Network.Messaging;
+using Elanetic.Network.Exceptions;
 
-namespace Isaac.Network.Spawning
+namespace Elanetic.Network.Spawning
 {
     public class NetworkBehaviourManager : NetworkModule
     {

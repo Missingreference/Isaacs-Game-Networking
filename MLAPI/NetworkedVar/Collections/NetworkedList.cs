@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using MLAPI.Serialization;
 using MLAPI.Serialization.Pooled;
-using Isaac.Network;
+using Elanetic.Network;
 using UnityEngine;
 
 namespace MLAPI.NetworkedVar.Collections

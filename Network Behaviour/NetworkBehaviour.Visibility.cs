@@ -12,11 +12,11 @@ using MLAPI.Internal;
 using MLAPI.Security;
 using BitStream = MLAPI.Serialization.BitStream;
 
-using Isaac.Network.Exceptions;
-using Isaac.Network.Messaging;
+using Elanetic.Network.Exceptions;
+using Elanetic.Network.Messaging;
 
 
-namespace Isaac.Network
+namespace Elanetic.Network
 {
     public abstract partial class NetworkBehaviour : MonoBehaviour
     {

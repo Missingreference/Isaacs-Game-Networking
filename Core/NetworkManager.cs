@@ -14,14 +14,14 @@ using MLAPI.Messaging;
 using MLAPI.Security;
 using MLAPI.Internal;
 
-using Isaac.Network.Connection;
-using Isaac.Network.Spawning;
-using Isaac.Network.Messaging;
-using Isaac.Network.SceneManagement;
-using Isaac.Network.Development;
-using Isaac.Network.Exceptions;
+using Elanetic.Network.Connection;
+using Elanetic.Network.Spawning;
+using Elanetic.Network.Messaging;
+using Elanetic.Network.SceneManagement;
+using Elanetic.Network.Development;
+using Elanetic.Network.Exceptions;
 
-namespace Isaac.Network
+namespace Elanetic.Network
 {
 	public class NetworkManager : MonoBehaviour
 	{

@@ -7,7 +7,7 @@ using UnityEngine;
 
 using MLAPI.Hashing;
 
-using Isaac.Network;
+using Elanetic.Network;
 
 namespace MLAPI.Messaging
 {

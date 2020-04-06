@@ -1,5 +1,5 @@
 using System.IO;
-using Isaac.Network;
+using Elanetic.Network;
 
 namespace MLAPI.NetworkedVar
 {

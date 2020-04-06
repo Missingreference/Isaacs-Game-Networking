@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 
-namespace Isaac.Network
+namespace Elanetic.Network
 {
     /// <summary>
     /// The base for any custom addon to the network.

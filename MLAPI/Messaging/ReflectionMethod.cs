@@ -4,7 +4,7 @@ using System.Reflection;
 using MLAPI.Serialization;
 using MLAPI.Serialization.Pooled;
 using UnityEngine;
-using Isaac.Network;
+using Elanetic.Network;
 
 namespace MLAPI.Messaging
 {

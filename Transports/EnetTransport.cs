@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using ENet;
-using Isaac.Network;
+using Elanetic.Network;
 
-namespace Isaac.Network.Transports
+namespace Elanetic.Network.Transports
 {
 	public class EnetTransport : NetworkTransport
 	{

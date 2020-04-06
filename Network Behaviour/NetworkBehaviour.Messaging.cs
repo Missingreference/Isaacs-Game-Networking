@@ -8,9 +8,9 @@ using MLAPI.Messaging;
 using MLAPI.Serialization.Pooled;
 using BitStream = MLAPI.Serialization.BitStream;
 
-using Isaac.Network.Messaging;
+using Elanetic.Network.Messaging;
 
-namespace Isaac.Network
+namespace Elanetic.Network
 {
     public abstract partial class NetworkBehaviour : MonoBehaviour
     {

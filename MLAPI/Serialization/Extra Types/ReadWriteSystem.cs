@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System;
 using MLAPI.Serialization;
 
-namespace Isaac.Network.Serialization
+namespace Elanetic.Network.Serialization
 {
     public static class ReadWriteSystem
     {

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Isaac.Network.Exceptions
+namespace Elanetic.Network.Exceptions
 {
     /// <summary>
     /// Exception thrown when the configuration of the Network Manager is not correctly setup. For example when the Network Config or Network Transport are missing or not setup correctly.

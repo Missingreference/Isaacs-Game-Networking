@@ -7,10 +7,10 @@ using UnityEngine;
 using UnityEngine.Networking;
 using Unet = UnityEngine.Networking.NetworkTransport;
 
-using Isaac.Network;
-using Isaac.Network.Exceptions;
+using Elanetic.Network;
+using Elanetic.Network.Exceptions;
 
-namespace Isaac.Network.Transports
+namespace Elanetic.Network.Transports
 {
 	public class UnetTransport : NetworkTransport
 	{

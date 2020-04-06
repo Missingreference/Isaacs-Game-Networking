@@ -9,9 +9,9 @@ using MLAPI.Messaging;
 using MLAPI.Serialization.Pooled;
 using BitStream = MLAPI.Serialization.BitStream;
 
-using Isaac.Network.Messaging;
+using Elanetic.Network.Messaging;
 
-namespace Isaac.Network.Development
+namespace Elanetic.Network.Development
 {
     /// <summary>
     /// This debug module is used for sending and receiving Unity logs across the network. Server can send it's logs to clients and clients can send their logs to the server.

@@ -1,4 +1,4 @@
-﻿namespace Isaac.Network.Connection
+﻿namespace Elanetic.Network.Connection
 {
 	/// <summary>
 	/// A class representing a client that is currently in the process of connecting.

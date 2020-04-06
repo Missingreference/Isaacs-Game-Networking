@@ -7,7 +7,7 @@ using MLAPI.Internal;
 using MLAPI.Security;
 using BitStream = MLAPI.Serialization.BitStream;
 
-namespace Isaac.Network.Messaging
+namespace Elanetic.Network.Messaging
 {
     /// <summary>
     /// Warning none of these check if the client ID parameter is a valid client to save on performance. Use at your own risk.

@@ -3,7 +3,7 @@ using UnityEngine;
 using System.IO;
 using System;
 using MLAPI.Serialization.Pooled;
-using Isaac.Network;
+using Elanetic.Network;
 
 namespace MLAPI.NetworkedVar
 {

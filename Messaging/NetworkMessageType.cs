@@ -1,5 +1,5 @@
 ﻿
-namespace Isaac.Network.Messaging
+namespace Elanetic.Network.Messaging
 {
     //Built in message types.
     public enum MessageType : byte

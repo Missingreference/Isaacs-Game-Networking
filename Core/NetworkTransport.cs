@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 
-namespace Isaac.Network
+namespace Elanetic.Network
 {
 	public abstract class NetworkTransport
 	{

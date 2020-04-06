@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using MLAPI.Reflection;
 using UnityEngine;
-using Isaac.Network;
+using Elanetic.Network;
 
 namespace MLAPI.Serialization
 {

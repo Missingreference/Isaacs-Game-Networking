@@ -7,8 +7,8 @@ using MLAPI.Serialization.Pooled;
 using MLAPI.Security;
 using BitStream = MLAPI.Serialization.BitStream;
 
-using Isaac.Network;
-using Isaac.Network.Messaging;
+using Elanetic.Network;
+using Elanetic.Network.Messaging;
 
 namespace MLAPI.Internal
 {

@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.IO;
 
-using Isaac.Network;
+using Elanetic.Network;
 using MLAPI.Messaging;
 using MLAPI.Serialization.Pooled;
 

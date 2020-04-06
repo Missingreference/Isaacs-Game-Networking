@@ -11,8 +11,8 @@ using MLAPI.Security;
 using MLAPI.Serialization;
 using MLAPI.Serialization.Pooled;
 
-using Isaac.Network;
-using Isaac.Network.Messaging;
+using Elanetic.Network;
+using Elanetic.Network.Messaging;
 
 namespace MLAPI.Spawning
 {
@@ -200,7 +200,7 @@ namespace MLAPI.Spawning
 				return;
 			}
 
-			//TODO Isaac: isSpawned?
+			//TODO isSpawned?
 			//if (!netObject.isSpawned)
 			{
 				//throw new SpawnStateException("Object is not spawned");

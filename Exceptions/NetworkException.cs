@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Isaac.Network.Exceptions
+namespace Elanetic.Network.Exceptions
 {
     /// <summary>
     /// A general exception used for any logic related to networking.

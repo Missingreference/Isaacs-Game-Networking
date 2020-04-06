@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Isaac.Network.Exceptions
+namespace Elanetic.Network.Exceptions
 {
     /// <summary>
     /// Exception thrown when the operation can only be done on a client
