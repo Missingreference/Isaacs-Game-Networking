@@ -8,8 +8,10 @@ using System.ComponentModel;
 using System.IO;
 using System.Text;
 using MLAPI.Reflection;
+#if UNITY_EDITOR || UNITY_STANDALONE
 using UnityEngine;
-using Elanetic.Network;
+using Elanetic.Network.Serialization;
+#endif
 
 namespace MLAPI.Serialization
 {
@@ -138,25 +140,26 @@ namespace MLAPI.Serialization
                 return ReadStringPacked().ToString();
             if (type == typeof(bool))
                 return ReadBool();
-            if (type == typeof(Vector2))
-                return ReadVector2Packed();
-            if (type == typeof(Vector3))
-                return ReadVector3Packed();
-            if (type == typeof(Vector4))
-                return ReadVector4Packed();
-            if (type == typeof(Color))
-                return ReadColorPacked();
-            if (type == typeof(Color32))
-                return ReadColor32();
-            if (type == typeof(Ray))
-                return ReadRayPacked();
-            if (type == typeof(Quaternion))
-                return ReadRotationPacked();
-            if (type == typeof(char))
+            if(type == typeof(char))
                 return ReadCharPacked();
-            if (type.IsEnum)
+            if(type.IsEnum)
                 return ReadInt32Packed();
-			/* TODO: Reimplement
+#if UNITY_EDITOR || UNITY_STANDALONE
+            if (type == typeof(Vector2))
+                return this.ReadVector2Packed();
+            if (type == typeof(Vector3))
+                return this.ReadVector3Packed();
+            if (type == typeof(Vector4))
+                return this.ReadVector4Packed();
+            if (type == typeof(Color))
+                return this.ReadColorPacked();
+            if (type == typeof(Color32))
+                return this.ReadColor32();
+            if (type == typeof(Ray))
+                return this.ReadRayPacked();
+            if (type == typeof(Quaternion))
+                return this.ReadRotationPacked();
+            /* TODO: Reimplement
             if (type == typeof(GameObject))
             {
                 ulong networkId = ReadUInt64Packed();
@@ -200,6 +203,7 @@ namespace MLAPI.Serialization
                 }
             }
 			*/
+#endif
             if (typeof(IBitWritable).IsAssignableFrom(type))
             {
                 object instance = Activator.CreateInstance(type);
@@ -267,72 +271,6 @@ namespace MLAPI.Serialization
         }
 
         /// <summary>
-        /// Read a Vector2 from the stream.
-        /// </summary>
-        /// <returns>The Vector2 read from the stream.</returns>
-        public Vector2 ReadVector2() => new Vector2(ReadSingle(), ReadSingle());
-
-        /// <summary>
-        /// Read a Vector2 from the stream.
-        /// </summary>
-        /// <returns>The Vector2 read from the stream.</returns>
-        public Vector2 ReadVector2Packed() => new Vector2(ReadSinglePacked(), ReadSinglePacked());
-
-        /// <summary>
-        /// Read a Vector3 from the stream.
-        /// </summary>
-        /// <returns>The Vector3 read from the stream.</returns>
-        public Vector3 ReadVector3() => new Vector3(ReadSingle(), ReadSingle(), ReadSingle());
-
-        /// <summary>
-        /// Read a Vector3 from the stream.
-        /// </summary>
-        /// <returns>The Vector3 read from the stream.</returns>
-        public Vector3 ReadVector3Packed() => new Vector3(ReadSinglePacked(), ReadSinglePacked(), ReadSinglePacked());
-
-        /// <summary>
-        /// Read a Vector4 from the stream.
-        /// </summary>
-        /// <returns>The Vector4 read from the stream.</returns>
-        public Vector4 ReadVector4() => new Vector4(ReadSingle(), ReadSingle(), ReadSingle(), ReadSingle());
-
-        /// <summary>
-        /// Read a Vector4 from the stream.
-        /// </summary>
-        /// <returns>The Vector4 read from the stream.</returns>
-        public Vector4 ReadVector4Packed() => new Vector4(ReadSinglePacked(), ReadSinglePacked(), ReadSinglePacked(), ReadSinglePacked());
-
-        /// <summary>
-        /// Read a Color from the stream.
-        /// </summary>
-        /// <returns>The Color read from the stream.</returns>
-        public Color ReadColor() => new Color(ReadSingle(), ReadSingle(), ReadSingle(), ReadSingle());
-
-        /// <summary>
-        /// Read a Color from the stream.
-        /// </summary>
-        /// <returns>The Color read from the stream.</returns>
-        public Color ReadColorPacked() => new Color(ReadSinglePacked(), ReadSinglePacked(), ReadSinglePacked(), ReadSinglePacked());
-
-        /// <summary>
-        /// Read a Color32 from the stream.
-        /// </summary>
-        /// <returns>The Color32 read from the stream.</returns>
-        public Color32 ReadColor32() => new Color32((byte)ReadByte(), (byte)ReadByte(), (byte)ReadByte(), (byte)ReadByte());
-
-        /// <summary>
-        /// Read a Ray from the stream.
-        /// </summary>
-        /// <returns>The Ray read from the stream.</returns>
-        public Ray ReadRay() => new Ray(ReadVector3(), ReadVector3());
-
-        /// <summary>
-        /// Read a Ray from the stream.
-        /// </summary>
-        /// <returns>The Ray read from the stream.</returns>
-        public Ray ReadRayPacked() => new Ray(ReadVector3Packed(), ReadVector3Packed());
-
-        /// <summary>
         /// Read a single-precision floating point value from the stream. The value is between (inclusive) the minValue and maxValue.
         /// </summary>
         /// <param name="minValue">Minimum value that this value could be</param>
@@ -360,46 +298,6 @@ namespace MLAPI.Serialization
             ulong read = 0;
             for (int i = 0; i < bytes; ++i) read |= (ulong)ReadByte() << (i << 3);
             return (((double)read / ((0x100 * bytes) - 1)) * (minValue + maxValue)) - minValue;
-        }
-
-        /// <summary>
-        /// Reads the rotation from the stream
-        /// </summary>
-        /// <returns>The rotation read from the stream</returns>
-        public Quaternion ReadRotationPacked()
-        {
-            float x = ReadSinglePacked();
-            float y = ReadSinglePacked();
-            float z = ReadSinglePacked();
-
-            float w = Mathf.Sqrt(1 - ((Mathf.Pow(x, 2) - (Mathf.Pow(y, 2) - (Mathf.Pow(z, 2))))));
-
-            return new Quaternion(x, y, z, w);
-        }
-
-        /// <summary>
-        /// Reads the rotation from the stream
-        /// </summary>
-        /// <returns>The rotation read from the stream</returns>
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        [Obsolete("Use ReadRotationPacked instead")]
-        public Quaternion ReadRotation(int bytesPerAngle)
-        {
-            return ReadRotationPacked();
-        }
-
-        /// <summary>
-        /// Reads the rotation from the stream
-        /// </summary>
-        /// <returns>The rotation read from the stream</returns>
-        public Quaternion ReadRotation()
-        {
-            float x = ReadSingle();
-            float y = ReadSingle();
-            float z = ReadSingle();
-            float w = ReadSingle();
-
-            return new Quaternion(x, y, z, w);
         }
 
         /// <summary>

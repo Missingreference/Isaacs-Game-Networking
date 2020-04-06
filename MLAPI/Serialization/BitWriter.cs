@@ -8,9 +8,12 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using MLAPI.Reflection;
-using UnityEngine;
 using Elanetic.Network;
+#if UNITY_EDITOR || UNITY_STANDALONE
+using UnityEngine;
+using Elanetic.Network.Serialization;
 using Debug = UnityEngine.Debug;
+#endif
 
 namespace MLAPI.Serialization
 {
@@ -43,6 +46,7 @@ namespace MLAPI.Serialization
             bitSink = stream as BitStream;
         }
 
+        
         /// <summary>
         /// Writes a boxed object in a packed format
         /// </summary>
@@ -75,114 +79,96 @@ namespace MLAPI.Serialization
                     {
                         WriteObjectPacked(array.GetValue(i));
                     }
-
-                    return;
+                }
+                else
+                {
+                    throw new ArgumentException("BitWriter cannot write type " + value.GetType().Name);
                 }
             }
             else if (value is byte)
             {
                 WriteByte((byte)value);
-                return;
             }
             else if (value is sbyte)
             {
                 WriteSByte((sbyte)value);
-                return;
             }
             else if (value is ushort)
             {
                 WriteUInt16Packed((ushort)value);
-                return;
             }
             else if (value is short)
             {
                 WriteInt16Packed((short)value);
-                return;
             }
             else if (value is int)
             {
                 WriteInt32Packed((int)value);
-                return;
             }
             else if (value is uint)
             {
                 WriteUInt32Packed((uint)value);
-                return;
             }
             else if (value is long)
             {
                 WriteInt64Packed((long)value);
-                return;
             }
             else if (value is ulong)
             {
                 WriteUInt64Packed((ulong)value);
-                return;
             }
             else if (value is float)
             {
                 WriteSinglePacked((float)value);
-                return;
             }
             else if (value is double)
             {
                 WriteDoublePacked((double)value);
-                return;
             }
             else if (value is string)
             {
                 WriteStringPacked((string)value);
-                return;
             }
             else if (value is bool)
             {
                 WriteBit((bool)value);
-                return;
             }
+            else if(value is char)
+            {
+                WriteCharPacked((char)value);
+            }
+            else if(value.GetType().IsEnum)
+            {
+                WriteInt32Packed((int)value);
+            }
+#if UNITY_EDITOR || UNITY_STANDALONE
             else if (value is Vector2)
             {
-                WriteVector2Packed((Vector2)value);
-                return;
+                this.WriteVector2Packed((Vector2)value);
             }
             else if (value is Vector3)
             {
-                WriteVector3Packed((Vector3)value);
-                return;
+                this.WriteVector3Packed((Vector3)value);
             }
             else if (value is Vector4)
             {
-                WriteVector4Packed((Vector4)value);
-                return;
+                this.WriteVector4Packed((Vector4)value);
             }
             else if (value is Color)
             {
-                WriteColorPacked((Color)value);
-                return;
+                this.WriteColorPacked((Color)value);
             }
             else if (value is Color32)
             {
-                WriteColor32((Color32)value);
-                return;
+                this.WriteColor32((Color32)value);
             }
             else if (value is Ray)
             {
-                WriteRayPacked((Ray)value);
-                return;
+                this.WriteRayPacked((Ray)value);
             }
             else if (value is Quaternion)
             {
-                WriteRotationPacked((Quaternion)value);
-                return;
-            }
-            else if (value is char)
-            {
-                WriteCharPacked((char)value);
-                return;
-            }
-            else if (value.GetType().IsEnum)
-            {
-                WriteInt32Packed((int)value);
-                return;
+                this.WriteRotationPacked((Quaternion)value);
             }
             else if (value is GameObject)
             {
@@ -195,23 +181,22 @@ namespace MLAPI.Serialization
                 {
                     WriteUInt64Packed(networkedObject.networkID);
                 }
-                return;
             }
+#endif
             else if (value is NetworkBehaviour)
             {
                 Debug.LogWarning("Received unimplemented NetworkBehaviour object");
                 //WriteUInt64Packed(((NetworkBehaviour)value).networkID);
                 //WriteUInt16Packed(((NetworkBehaviour)value).GetBehaviourId());
-                return;
             }
             else if (value is IBitWritable)
             {
                 ((IBitWritable)value).Write(this.sink);
-                return;
             }
-
-
-            throw new ArgumentException("BitWriter cannot write type " + value.GetType().Name);
+            else
+            {
+                throw new ArgumentException("BitWriter cannot write type " + value.GetType().Name);
+            }
         }
 
         /// <summary>
@@ -263,128 +248,6 @@ namespace MLAPI.Serialization
         }
 
         /// <summary>
-        /// Convenience method that writes two non-packed Vector3 from the ray to the stream
-        /// </summary>
-        /// <param name="ray">Ray to write</param>
-        public void WriteRay(Ray ray)
-        {
-            WriteVector3(ray.origin);
-            WriteVector3(ray.direction);
-        }
-
-        /// <summary>
-        /// Convenience method that writes two packed Vector3 from the ray to the stream
-        /// </summary>
-        /// <param name="ray">Ray to write</param>
-        public void WriteRayPacked(Ray ray)
-        {
-            WriteVector3Packed(ray.origin);
-            WriteVector3Packed(ray.direction);
-        }
-
-        /// <summary>
-        /// Convenience method that writes four non-varint floats from the color to the stream
-        /// </summary>
-        /// <param name="color">Color to write</param>
-        public void WriteColor(Color color)
-        {
-            WriteSingle(color.r);
-            WriteSingle(color.g);
-            WriteSingle(color.b);
-            WriteSingle(color.a);
-        }
-
-        /// <summary>
-        /// Convenience method that writes four varint floats from the color to the stream
-        /// </summary>
-        /// <param name="color">Color to write</param>
-        public void WriteColorPacked(Color color)
-        {
-            WriteSinglePacked(color.r);
-            WriteSinglePacked(color.g);
-            WriteSinglePacked(color.b);
-            WriteSinglePacked(color.a);
-        }
-
-        /// <summary>
-        /// Convenience method that writes four non-varint floats from the color to the stream
-        /// </summary>
-        /// <param name="color32">Color32 to write</param>
-        public void WriteColor32(Color32 color32)
-        {
-            WriteSingle(color32.r);
-            WriteSingle(color32.g);
-            WriteSingle(color32.b);
-            WriteSingle(color32.a);
-        }
-
-        /// <summary>
-        /// Convenience method that writes two non-varint floats from the vector to the stream
-        /// </summary>
-        /// <param name="vector2">Vector to write</param>
-        public void WriteVector2(Vector2 vector2)
-        {
-            WriteSingle(vector2.x);
-            WriteSingle(vector2.y);
-        }
-
-        /// <summary>
-        /// Convenience method that writes two varint floats from the vector to the stream
-        /// </summary>
-        /// <param name="vector2">Vector to write</param>
-        public void WriteVector2Packed(Vector2 vector2)
-        {
-            WriteSinglePacked(vector2.x);
-            WriteSinglePacked(vector2.y);
-        }
-
-        /// <summary>
-        /// Convenience method that writes three non-varint floats from the vector to the stream
-        /// </summary>
-        /// <param name="vector3">Vector to write</param>
-        public void WriteVector3(Vector3 vector3)
-        {
-            WriteSingle(vector3.x);
-            WriteSingle(vector3.y);
-            WriteSingle(vector3.z);
-        }
-
-        /// <summary>
-        /// Convenience method that writes three varint floats from the vector to the stream
-        /// </summary>
-        /// <param name="vector3">Vector to write</param>
-        public void WriteVector3Packed(Vector3 vector3)
-        {
-            WriteSinglePacked(vector3.x);
-            WriteSinglePacked(vector3.y);
-            WriteSinglePacked(vector3.z);
-        }
-
-        /// <summary>
-        /// Convenience method that writes four non-varint floats from the vector to the stream
-        /// </summary>
-        /// <param name="vector4">Vector to write</param>
-        public void WriteVector4(Vector4 vector4)
-        {
-            WriteSingle(vector4.x);
-            WriteSingle(vector4.y);
-            WriteSingle(vector4.z);
-            WriteSingle(vector4.w);
-        }
-
-        /// <summary>
-        /// Convenience method that writes four varint floats from the vector to the stream
-        /// </summary>
-        /// <param name="vector4">Vector to write</param>
-        public void WriteVector4Packed(Vector4 vector4)
-        {
-            WriteSinglePacked(vector4.x);
-            WriteSinglePacked(vector4.y);
-            WriteSinglePacked(vector4.z);
-            WriteSinglePacked(vector4.w);
-        }
-
-        /// <summary>
         /// Write a single-precision floating point value to the stream. The value is between (inclusive) the minValue and maxValue.
         /// </summary>
         /// <param name="value">Value to write</param>
@@ -412,50 +275,6 @@ namespace MLAPI.Serialization
             if (value < minValue || value > maxValue) throw new ArgumentOutOfRangeException("Given value does not match the given constraints!");
             ulong result = (ulong)(((value + minValue) / (maxValue + minValue)) * ((0x100 * bytes) - 1));
             for (int i = 0; i < bytes; ++i) WriteByte((byte)(result >> (i << 3)));
-        }
-
-        /// <summary>
-        /// Writes the rotation to the stream.
-        /// </summary>
-        /// <param name="rotation">Rotation to write</param>
-        public void WriteRotationPacked(Quaternion rotation)
-        {
-            if (Mathf.Sign(rotation.w) < 0)
-            {
-                WriteSinglePacked(-rotation.x);
-                WriteSinglePacked(-rotation.y);
-                WriteSinglePacked(-rotation.z);
-            }
-            else
-            {
-                WriteSinglePacked(rotation.x);
-                WriteSinglePacked(rotation.y);
-                WriteSinglePacked(rotation.z);
-            }
-        }
-
-        /// <summary>
-        /// Writes the rotation to the stream.
-        /// </summary>
-        /// <param name="rotation">Rotation to write</param>
-        /// <param name="bytesPerAngle">Unused</param>
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        [Obsolete("Use WriteRotationPacked instead")]
-        public void WriteRotation(Quaternion rotation, int bytesPerAngle)
-        {
-            WriteRotationPacked(rotation);
-        }
-
-        /// <summary>
-        /// Writes the rotation to the stream.
-        /// </summary>
-        /// <param name="rotation">Rotation to write</param>
-        public void WriteRotation(Quaternion rotation)
-        {
-            WriteSingle(rotation.x);
-            WriteSingle(rotation.y);
-            WriteSingle(rotation.z);
-            WriteSingle(rotation.w);
         }
 
         /// <summary>

@@ -5,8 +5,10 @@ using MLAPI.Serialization;
 
 namespace Elanetic.Network.Serialization
 {
-    public static class ReadWriteSystem
+    public static class SerializeSystemTypes
     {
+        #region Version
+
         static public void WriteVersion(this BitWriter writer, Version version)
         {
             writer.WriteInt32(version.Major);
@@ -42,6 +44,10 @@ namespace Elanetic.Network.Serialization
             return new Version(major, minor);
         }
 
+        #endregion Version
+
+        #region DateTime
+
         static public void WriteDateTime(this BitWriter writer, DateTime dateTime)
         {
             writer.WriteInt64(dateTime.Ticks);
@@ -52,5 +58,7 @@ namespace Elanetic.Network.Serialization
         {
             return new DateTime(reader.ReadInt64(), (DateTimeKind)reader.ReadInt32());
         }
+
+        #endregion DateTime
     }
 }
