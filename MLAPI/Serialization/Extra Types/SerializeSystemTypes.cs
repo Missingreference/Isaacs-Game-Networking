@@ -60,5 +60,19 @@ namespace Elanetic.Network.Serialization
         }
 
         #endregion DateTime
+
+        #region Type
+
+        static public void WriteType(this BitWriter writer, Type version)
+        {
+            writer.WriteString(version.AssemblyQualifiedName);
+        }
+
+        static public Type ReadType(this BitReader reader)
+        {
+            return Type.GetType(reader.ReadString().ToString());
+        }
+
+        #endregion
     }
 }
