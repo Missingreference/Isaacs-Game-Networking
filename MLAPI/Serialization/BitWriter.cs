@@ -11,7 +11,6 @@ using MLAPI.Reflection;
 using Elanetic.Network;
 #if UNITY_EDITOR || UNITY_STANDALONE
 using UnityEngine;
-using Elanetic.Network.Serialization;
 using Debug = UnityEngine.Debug;
 #endif
 
@@ -46,157 +45,10 @@ namespace MLAPI.Serialization
             bitSink = stream as BitStream;
         }
 
-        
-        /// <summary>
-        /// Writes a boxed object in a packed format
-        /// </summary>
-        /// <param name="value">The object to write</param>
-        public void WriteObjectPacked(object value)
+        [Obsolete]
+        public void WriteObjectPacked(object obj)
         {
-            if (value == null || value.GetType().IsNullable())
-            {
-                WriteBool(value == null);
-
-                if (value == null)
-                {
-                    return;
-                }
-            }
-
-            if (SerializationManager.TrySerialize(sink, value))
-            {
-                return;
-            }
-            else if (value is Array array)
-            {
-                Type elementType = value.GetType().GetElementType();
-
-                if (SerializationManager.IsTypeSupported(elementType))
-                {
-                    WriteInt32Packed(array.Length);
-
-                    for (int i = 0; i < array.Length; i++)
-                    {
-                        WriteObjectPacked(array.GetValue(i));
-                    }
-                }
-                else
-                {
-                    throw new ArgumentException("BitWriter cannot write type " + value.GetType().Name);
-                }
-            }
-            else if (value is byte)
-            {
-                WriteByte((byte)value);
-            }
-            else if (value is sbyte)
-            {
-                WriteSByte((sbyte)value);
-            }
-            else if (value is ushort)
-            {
-                WriteUInt16Packed((ushort)value);
-            }
-            else if (value is short)
-            {
-                WriteInt16Packed((short)value);
-            }
-            else if (value is int)
-            {
-                WriteInt32Packed((int)value);
-            }
-            else if (value is uint)
-            {
-                WriteUInt32Packed((uint)value);
-            }
-            else if (value is long)
-            {
-                WriteInt64Packed((long)value);
-            }
-            else if (value is ulong)
-            {
-                WriteUInt64Packed((ulong)value);
-            }
-            else if (value is float)
-            {
-                WriteSinglePacked((float)value);
-            }
-            else if (value is double)
-            {
-                WriteDoublePacked((double)value);
-            }
-            else if (value is string)
-            {
-                WriteStringPacked((string)value);
-            }
-            else if (value is bool)
-            {
-                WriteBit((bool)value);
-            }
-            else if(value is char)
-            {
-                WriteCharPacked((char)value);
-            }
-            else if(value.GetType().IsEnum)
-            {
-                WriteInt32Packed((int)value);
-            }
-#if UNITY_EDITOR || UNITY_STANDALONE
-            else if (value is Vector2)
-            {
-                this.WriteVector2Packed((Vector2)value);
-            }
-            else if (value is Vector3)
-            {
-                this.WriteVector3Packed((Vector3)value);
-            }
-            else if (value is Vector4)
-            {
-                this.WriteVector4Packed((Vector4)value);
-            }
-            else if (value is Color)
-            {
-                this.WriteColorPacked((Color)value);
-            }
-            else if (value is Color32)
-            {
-                this.WriteColor32((Color32)value);
-            }
-            else if (value is Ray)
-            {
-                this.WriteRayPacked((Ray)value);
-            }
-            else if (value is Quaternion)
-            {
-                this.WriteRotationPacked((Quaternion)value);
-            }
-            else if (value is GameObject)
-            {
-                NetworkBehaviour networkedObject = ((GameObject)value).GetComponent<NetworkBehaviour>();
-                if (networkedObject == null)
-                {
-                    throw new ArgumentException("BitWriter cannot write GameObject types that does not has a NetworkedObject component attached. GameObject: " + ((GameObject)value).name);
-                }
-                else
-                {
-                    WriteUInt64Packed(networkedObject.networkID);
-                }
-            }
-#endif
-            else if (value is NetworkBehaviour)
-            {
-                Debug.LogWarning("Received unimplemented NetworkBehaviour object");
-                //WriteUInt64Packed(((NetworkBehaviour)value).networkID);
-                //WriteUInt16Packed(((NetworkBehaviour)value).GetBehaviourId());
-            }
-            else if (value is IBitWritable)
-            {
-                ((IBitWritable)value).Write(this.sink);
-            }
-            else
-            {
-                throw new ArgumentException("BitWriter cannot write type " + value.GetType().Name);
-            }
+            throw new NotImplementedException();
         }
 
         /// <summary>

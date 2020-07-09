@@ -10,7 +10,6 @@ using System.Text;
 using MLAPI.Reflection;
 #if UNITY_EDITOR || UNITY_STANDALONE
 using UnityEngine;
-using Elanetic.Network.Serialization;
 #endif
 
 namespace MLAPI.Serialization
@@ -84,141 +83,10 @@ namespace MLAPI.Serialization
             while (!bitSource.BitAligned) ReadBit();
         }
 
-        /// <summary>
-        /// Reads a single boxed object of a given type in a packed format
-        /// </summary>
-        /// <param name="type">The type to read</param>
-        /// <returns>Returns the boxed read object</returns>
+        [Obsolete]
         public object ReadObjectPacked(Type type)
         {
-            if (type.IsNullable())
-            {
-                bool isNull = ReadBool();
-
-                if (isNull)
-                {
-                    return null;
-                }
-            }
-            
-            if (SerializationManager.TryDeserialize(source, type, out object obj))
-                return obj;
-            if (type.IsArray && type.HasElementType)
-            {
-                int size = ReadInt32Packed();
-
-                Array array = Array.CreateInstance(type.GetElementType(), size);
-
-                for (int i = 0; i < size; i++)
-                {
-                    array.SetValue(ReadObjectPacked(type.GetElementType()), i);
-                }
-
-                return array;
-            }
-            if (type == typeof(byte))
-                return ReadByteDirect();
-            if (type == typeof(sbyte))
-                return ReadSByte();
-            if (type == typeof(ushort))
-                return ReadUInt16Packed();
-            if (type == typeof(short))
-                return ReadInt16Packed();
-            if (type == typeof(int))
-                return ReadInt32Packed();
-            if (type == typeof(uint))
-                return ReadUInt32Packed();
-            if (type == typeof(long))
-                return ReadInt64Packed();
-            if (type == typeof(ulong))
-                return ReadUInt64Packed();
-            if (type == typeof(float))
-                return ReadSinglePacked();
-            if (type == typeof(double))
-                return ReadDoublePacked();
-            if (type == typeof(string))
-                return ReadStringPacked().ToString();
-            if (type == typeof(bool))
-                return ReadBool();
-            if(type == typeof(char))
-                return ReadCharPacked();
-            if(type.IsEnum)
-                return ReadInt32Packed();
-#if UNITY_EDITOR || UNITY_STANDALONE
-            if (type == typeof(Vector2))
-                return this.ReadVector2Packed();
-            if (type == typeof(Vector3))
-                return this.ReadVector3Packed();
-            if (type == typeof(Vector4))
-                return this.ReadVector4Packed();
-            if (type == typeof(Color))
-                return this.ReadColorPacked();
-            if (type == typeof(Color32))
-                return this.ReadColor32();
-            if (type == typeof(Ray))
-                return this.ReadRayPacked();
-            if (type == typeof(Quaternion))
-                return this.ReadRotationPacked();
-            /* TODO: Reimplement
-            if (type == typeof(GameObject))
-            {
-                ulong networkId = ReadUInt64Packed();
-                
-                if (SpawnManager.SpawnedObjects.ContainsKey(networkId)) 
-                {
-                    return SpawnManager.SpawnedObjects[networkId].gameObject;
-                }
-                else 
-                {
-                    Debug.LogWarning("BitReader cannot find the GameObject sent in the SpawnedObjects list, it may have been destroyed. NetworkId: " + networkId.ToString());
-                    return null;
-                }
-            }
-            if (type == typeof(NetworkedObject))
-            {
-                ulong networkId = ReadUInt64Packed();
-                
-                if (SpawnManager.SpawnedObjects.ContainsKey(networkId)) 
-                {
-                    return SpawnManager.SpawnedObjects[networkId];
-                }
-                else 
-                {
-					Debug.LogWarning("BitReader cannot find the NetworkedObject sent in the SpawnedObjects list, it may have been destroyed. NetworkId: " + networkId.ToString());
-                    return null;
-                }
-            }
-            if (typeof(NetworkBehaviour).IsAssignableFrom(type))
-            {
-                ulong networkId = ReadUInt64Packed();
-                ushort behaviourId = ReadUInt16Packed();
-                if (SpawnManager.SpawnedObjects.ContainsKey(networkId)) 
-                {
-                    return SpawnManager.SpawnedObjects[networkId].GetBehaviourAtOrderIndex(behaviourId);
-                }
-                else 
-                {
-					Debug.LogWarning("BitReader cannot find the NetworkedBehaviour sent in the SpawnedObjects list, it may have been destroyed. NetworkId: " + networkId.ToString());
-                    return null;
-                }
-            }
-			*/
-#endif
-            if (typeof(IBitWritable).IsAssignableFrom(type))
-            {
-                object instance = Activator.CreateInstance(type);
-                ((IBitWritable)instance).Read(this.source);
-                return instance;
-            }
-
-            Type nullableUnderlyingType = Nullable.GetUnderlyingType(type);
-
-            if (nullableUnderlyingType != null && SerializationManager.IsTypeSupported(nullableUnderlyingType))
-            {
-                return ReadObjectPacked(nullableUnderlyingType);
-            }
-
-            throw new ArgumentException("BitReader cannot read type " + type.Name);
+            throw new NotImplementedException();
         }
 
         /// <summary>
